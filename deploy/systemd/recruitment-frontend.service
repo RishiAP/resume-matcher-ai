@@ -1,0 +1,20 @@
+# Frontend (Next.js) production service
+# Build with `yarn run build` before enabling this service.
+[Unit]
+Description=Resume Matcher Frontend (Next.js)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=rishi
+Group=rishi
+WorkingDirectory=/home/rishi/Documents/dev/resume-matcher-ai/frontend
+Environment=NODE_ENV=production
+# Use yarn start (runs `next start`) — ensure Node/npm are installed system-wide
+ExecStart=/usr/bin/yarn run start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

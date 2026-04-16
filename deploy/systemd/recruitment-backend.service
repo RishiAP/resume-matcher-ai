@@ -1,0 +1,23 @@
+# Resume Matcher backend (FastAPI via uvicorn)
+# Customize: change User/Group and paths if needed.
+[Unit]
+Description=Resume Matcher Backend (uvicorn)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=rishi
+Group=rishi
+WorkingDirectory=/home/rishi/Documents/dev/resume-matcher-ai/backend
+# Optional environment file (create by copying .env.example -> .env)
+# Leading '-' tells systemd to ignore if the file is missing.
+EnvironmentFile=-/home/rishi/Documents/dev/resume-matcher-ai/backend/.env
+# Path to uvicorn inside your virtualenv
+ExecStart=/home/rishi/Documents/dev/resume-matcher-ai/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

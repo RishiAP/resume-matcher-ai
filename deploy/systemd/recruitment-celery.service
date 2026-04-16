@@ -1,0 +1,20 @@
+# Celery worker for resume ingestion tasks
+# Adjust concurrency/prefetch values via .env or change ExecStart accordingly.
+[Unit]
+Description=Resume Matcher Celery Worker
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=rishi
+Group=rishi
+WorkingDirectory=/home/rishi/Documents/dev/resume-matcher-ai/backend
+EnvironmentFile=-/home/rishi/Documents/dev/resume-matcher-ai/backend/.env
+# Use bash to expand optional env vars (CELERY_WORKER_CONCURRENCY, CELERY_WORKER_PREFETCH_MULTIPLIER)
+ExecStart=/bin/bash -lc 'exec /home/rishi/Documents/dev/resume-matcher-ai/backend/.venv/bin/celery -A app.celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-1} --prefetch-multiplier=${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}'
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
