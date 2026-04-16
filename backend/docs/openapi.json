@@ -1,0 +1,2463 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Recruitment Dashboard API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/resume/upload": {
+      "post": {
+        "tags": [
+          "Resume"
+        ],
+        "summary": "Upload Resume",
+        "operationId": "upload_resume_api_resume_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_resume_api_resume_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadEnqueueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resume/upload/bulk": {
+      "post": {
+        "tags": [
+          "Resume"
+        ],
+        "summary": "Upload Resume Bulk",
+        "operationId": "upload_resume_bulk_api_resume_upload_bulk_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_resume_bulk_api_resume_upload_bulk_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUploadEnqueueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resume/upload/url": {
+      "post": {
+        "tags": [
+          "Resume"
+        ],
+        "summary": "Upload Resume By Url",
+        "operationId": "upload_resume_by_url_api_resume_upload_url_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeUrlUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadEnqueueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resume/upload/url/bulk": {
+      "post": {
+        "tags": [
+          "Resume"
+        ],
+        "summary": "Upload Resume Urls Bulk",
+        "operationId": "upload_resume_urls_bulk_api_resume_upload_url_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeBulkUrlUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUploadEnqueueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/resume/jobs": {
+      "get": {
+        "tags": [
+          "Resume"
+        ],
+        "summary": "Jobs Overview",
+        "operationId": "jobs_overview_api_resume_jobs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueJobsStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidates": {
+      "get": {
+        "tags": [
+          "Candidates"
+        ],
+        "summary": "List Candidates",
+        "operationId": "list_candidates_api_candidates_get",
+        "parameters": [
+          {
+            "name": "skills",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Skills"
+            }
+          },
+          {
+            "name": "min_exp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Exp"
+            }
+          },
+          {
+            "name": "max_exp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Exp"
+            }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Location"
+            }
+          },
+          {
+            "name": "skill_experience",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Skill Experience"
+            }
+          },
+          {
+            "name": "role_experience",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role Experience"
+            }
+          },
+          {
+            "name": "skill_match_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "all",
+                "any"
+              ],
+              "type": "string",
+              "default": "all",
+              "title": "Skill Match Mode"
+            }
+          },
+          {
+            "name": "comment_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "desc",
+                "asc"
+              ],
+              "type": "string",
+              "default": "desc",
+              "title": "Comment Order"
+            }
+          },
+          {
+            "name": "requirement_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requirement Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CandidateRead"
+                  },
+                  "title": "Response List Candidates Api Candidates Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidates/{candidate_id}": {
+      "patch": {
+        "tags": [
+          "Candidates"
+        ],
+        "summary": "Update Candidate",
+        "operationId": "update_candidate_api_candidates__candidate_id__patch",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidates/{candidate_id}/comments": {
+      "post": {
+        "tags": [
+          "Candidates"
+        ],
+        "summary": "Add Candidate Comment",
+        "operationId": "add_candidate_comment_api_candidates__candidate_id__comments_post",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HRCommentWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HRCommentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidates/{candidate_id}/comments/{comment_id}": {
+      "patch": {
+        "tags": [
+          "Candidates"
+        ],
+        "summary": "Update Candidate Comment",
+        "operationId": "update_candidate_comment_api_candidates__candidate_id__comments__comment_id__patch",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "comment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Comment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HRCommentWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HRCommentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requirements": {
+      "get": {
+        "tags": [
+          "Requirements"
+        ],
+        "summary": "List Requirements",
+        "operationId": "list_requirements_api_requirements_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RequirementRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Requirements Api Requirements Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Requirements"
+        ],
+        "summary": "Create Requirement",
+        "operationId": "create_requirement_api_requirements_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requirements/{requirement_id}": {
+      "patch": {
+        "tags": [
+          "Requirements"
+        ],
+        "summary": "Update Requirement",
+        "operationId": "update_requirement_api_requirements__requirement_id__patch",
+        "parameters": [
+          {
+            "name": "requirement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Requirement Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requirements/extract": {
+      "post": {
+        "tags": [
+          "Requirements"
+        ],
+        "summary": "Extract Requirement",
+        "operationId": "extract_requirement_api_requirements_extract_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementExtractRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementExtractResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/matching/{requirement_id}": {
+      "post": {
+        "tags": [
+          "Matching"
+        ],
+        "summary": "Run Matching",
+        "operationId": "run_matching_api_matching__requirement_id__post",
+        "parameters": [
+          {
+            "name": "requirement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Requirement Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatchResultRead"
+                  },
+                  "title": "Response Run Matching Api Matching  Requirement Id  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Matching"
+        ],
+        "summary": "Get Results",
+        "operationId": "get_results_api_matching__requirement_id__get",
+        "parameters": [
+          {
+            "name": "requirement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Requirement Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatchResultRead"
+                  },
+                  "title": "Response Get Results Api Matching  Requirement Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/matching/{requirement_id}/candidates/{candidate_id}": {
+      "post": {
+        "tags": [
+          "Matching"
+        ],
+        "summary": "Run Candidate Matching",
+        "operationId": "run_candidate_matching_api_matching__requirement_id__candidates__candidate_id__post",
+        "parameters": [
+          {
+            "name": "requirement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Requirement Id"
+            }
+          },
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatchResultRead"
+                  },
+                  "title": "Response Run Candidate Matching Api Matching  Requirement Id  Candidates  Candidate Id  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/matching/{requirement_id}/candidates/{candidate_id}/status": {
+      "patch": {
+        "tags": [
+          "Matching"
+        ],
+        "summary": "Update Candidate Status",
+        "operationId": "update_candidate_status_api_matching__requirement_id__candidates__candidate_id__status_patch",
+        "parameters": [
+          {
+            "name": "requirement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Requirement Id"
+            }
+          },
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchStatusUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateRequirementStatusRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/matching/{requirement_id}/bulk/reject-zero": {
+      "post": {
+        "tags": [
+          "Matching"
+        ],
+        "summary": "Reject Zero Scores",
+        "operationId": "reject_zero_scores_api_matching__requirement_id__bulk_reject_zero_post",
+        "parameters": [
+          {
+            "name": "requirement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Requirement Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkStatusUpdateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/matching/{requirement_id}/bulk/threshold": {
+      "post": {
+        "tags": [
+          "Matching"
+        ],
+        "summary": "Apply Threshold Status",
+        "operationId": "apply_threshold_status_api_matching__requirement_id__bulk_threshold_post",
+        "parameters": [
+          {
+            "name": "requirement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Requirement Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchThresholdStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkStatusUpdateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/matching/overview/{requirement_id}": {
+      "get": {
+        "tags": [
+          "Matching"
+        ],
+        "summary": "Get Requirement Overview",
+        "operationId": "get_requirement_overview_api_matching_overview__requirement_id__get",
+        "parameters": [
+          {
+            "name": "requirement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Requirement Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementOverviewRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_upload_resume_api_resume_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "requirement_id": {
+            "type": "integer",
+            "title": "Requirement Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "requirement_id"
+        ],
+        "title": "Body_upload_resume_api_resume_upload_post"
+      },
+      "Body_upload_resume_bulk_api_resume_upload_bulk_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "requirement_id": {
+            "type": "integer",
+            "title": "Requirement Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files",
+          "requirement_id"
+        ],
+        "title": "Body_upload_resume_bulk_api_resume_upload_bulk_post"
+      },
+      "BulkStatusUpdateResponse": {
+        "properties": {
+          "requirement_id": {
+            "type": "integer",
+            "title": "Requirement Id"
+          },
+          "updated_count": {
+            "type": "integer",
+            "title": "Updated Count"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "rejected",
+              "hired"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement_id",
+          "updated_count",
+          "status"
+        ],
+        "title": "BulkStatusUpdateResponse"
+      },
+      "BulkUploadEnqueueResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "queued",
+            "title": "Status"
+          },
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          },
+          "rejected": {
+            "type": "integer",
+            "title": "Rejected"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "accepted",
+          "rejected"
+        ],
+        "title": "BulkUploadEnqueueResponse"
+      },
+      "CandidateEducationRead": {
+        "properties": {
+          "institute": {
+            "type": "string",
+            "title": "Institute"
+          },
+          "degree_name": {
+            "type": "string",
+            "title": "Degree Name"
+          },
+          "branch_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Name"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "year_of_passing": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year Of Passing"
+          },
+          "gpa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpa"
+          }
+        },
+        "type": "object",
+        "required": [
+          "institute",
+          "degree_name"
+        ],
+        "title": "CandidateEducationRead"
+      },
+      "CandidateExperienceRead": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "skills_used": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills Used"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "CandidateExperienceRead"
+      },
+      "CandidateMatchView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "experience_years": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experience Years"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "current_company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Company"
+          },
+          "resume_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "CandidateMatchView"
+      },
+      "CandidateProjectRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "skills_used": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills Used"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CandidateProjectRead"
+      },
+      "CandidateRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "current_company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Company"
+          },
+          "experience_years": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experience Years"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "highest_degree": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Highest Degree"
+          },
+          "year_of_passing": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year Of Passing"
+          },
+          "gpa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpa"
+          },
+          "resume_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Url"
+          },
+          "hr_comments": {
+            "items": {
+              "$ref": "#/components/schemas/HRCommentRead"
+            },
+            "type": "array",
+            "title": "Hr Comments"
+          },
+          "matched_skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Matched Skills"
+          },
+          "missing_skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Skills"
+          },
+          "interview_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Date"
+          },
+          "interview_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Time"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "structured_profile": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured Profile"
+          },
+          "skill_profiles": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateSkillRead"
+            },
+            "type": "array",
+            "title": "Skill Profiles"
+          },
+          "experiences": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateExperienceRead"
+            },
+            "type": "array",
+            "title": "Experiences"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateProjectRead"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "educations": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateEducationRead"
+            },
+            "type": "array",
+            "title": "Educations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "CandidateRead"
+      },
+      "CandidateRequirementStatusRead": {
+        "properties": {
+          "candidate_id": {
+            "type": "integer",
+            "title": "Candidate Id"
+          },
+          "requirement_id": {
+            "type": "integer",
+            "title": "Requirement Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "processing",
+              "rejected",
+              "hired"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "requirement_id",
+          "status"
+        ],
+        "title": "CandidateRequirementStatusRead"
+      },
+      "CandidateSkillRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "context": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "secondary",
+              "project",
+              "mentioned"
+            ],
+            "title": "Context"
+          },
+          "experience_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experience Months"
+          },
+          "experience_years": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experience Years"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "context"
+        ],
+        "title": "CandidateSkillRead"
+      },
+      "CandidateUpdate": {
+        "properties": {
+          "interview_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Date"
+          },
+          "interview_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Time"
+          }
+        },
+        "type": "object",
+        "title": "CandidateUpdate"
+      },
+      "HRCommentRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "comment"
+        ],
+        "title": "HRCommentRead"
+      },
+      "HRCommentWrite": {
+        "properties": {
+          "comment": {
+            "type": "string",
+            "maxLength": 1500,
+            "minLength": 1,
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "comment"
+        ],
+        "title": "HRCommentWrite"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "ai_mode": {
+            "type": "string",
+            "title": "Ai Mode"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "llm_model": {
+            "type": "string",
+            "title": "Llm Model"
+          },
+          "embed_mode": {
+            "type": "string",
+            "title": "Embed Mode"
+          },
+          "embed_provider": {
+            "type": "string",
+            "title": "Embed Provider"
+          },
+          "embed_model": {
+            "type": "string",
+            "title": "Embed Model"
+          },
+          "embed_dimensions": {
+            "type": "integer",
+            "title": "Embed Dimensions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "ai_mode",
+          "provider",
+          "llm_model",
+          "embed_mode",
+          "embed_provider",
+          "embed_model",
+          "embed_dimensions"
+        ],
+        "title": "HealthResponse"
+      },
+      "MatchResultRead": {
+        "properties": {
+          "candidate": {
+            "$ref": "#/components/schemas/CandidateMatchView"
+          },
+          "requirement": {
+            "$ref": "#/components/schemas/RequirementMatchView"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "processing",
+              "rejected",
+              "hired"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidate",
+          "requirement",
+          "score",
+          "reason",
+          "status"
+        ],
+        "title": "MatchResultRead"
+      },
+      "MatchStatusUpdateRequest": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "processing",
+              "rejected",
+              "hired"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "MatchStatusUpdateRequest"
+      },
+      "MatchThresholdStatusRequest": {
+        "properties": {
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "rejected",
+              "hired"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "threshold",
+          "status"
+        ],
+        "title": "MatchThresholdStatusRequest"
+      },
+      "QueueJobsStatus": {
+        "properties": {
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          },
+          "queued": {
+            "type": "integer",
+            "title": "Queued"
+          },
+          "workers_online": {
+            "type": "integer",
+            "title": "Workers Online"
+          }
+        },
+        "type": "object",
+        "required": [
+          "running",
+          "queued",
+          "workers_online"
+        ],
+        "title": "QueueJobsStatus"
+      },
+      "RequirementCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementSkillInput"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "required_skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Skills"
+          },
+          "min_experience": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Experience"
+          },
+          "max_experience": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Experience"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "min_ctc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Ctc"
+          },
+          "max_ctc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Ctc"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "qualification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "RequirementCreate"
+      },
+      "RequirementExtractRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 20,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "RequirementExtractRequest"
+      },
+      "RequirementExtractResponse": {
+        "properties": {
+          "requirement": {
+            "$ref": "#/components/schemas/RequirementCreate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement"
+        ],
+        "title": "RequirementExtractResponse"
+      },
+      "RequirementMatchView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "RequirementMatchView"
+      },
+      "RequirementOverviewRead": {
+        "properties": {
+          "requirement_id": {
+            "type": "integer",
+            "title": "Requirement Id"
+          },
+          "total_current_candidates": {
+            "type": "integer",
+            "title": "Total Current Candidates"
+          },
+          "total_rejected_candidates": {
+            "type": "integer",
+            "title": "Total Rejected Candidates"
+          },
+          "total_hired_candidates": {
+            "type": "integer",
+            "title": "Total Hired Candidates"
+          },
+          "total_processing_candidates": {
+            "type": "integer",
+            "title": "Total Processing Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement_id",
+          "total_current_candidates",
+          "total_rejected_candidates",
+          "total_hired_candidates",
+          "total_processing_candidates"
+        ],
+        "title": "RequirementOverviewRead"
+      },
+      "RequirementRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementSkillRead"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "required_skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Skills"
+          },
+          "min_experience": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Experience"
+          },
+          "max_experience": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Experience"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "min_ctc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Ctc"
+          },
+          "max_ctc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Ctc"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "qualification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualification"
+          },
+          "summary_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary Text"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "RequirementRead"
+      },
+      "RequirementSkillInput": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "min_experience_years": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Experience Years"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "RequirementSkillInput"
+      },
+      "RequirementSkillRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "min_experience_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Experience Months"
+          },
+          "min_experience_years": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Experience Years"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "RequirementSkillRead"
+      },
+      "ResumeBulkUrlUploadRequest": {
+        "properties": {
+          "urls": {
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "format": "uri"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Urls"
+          },
+          "requirement_id": {
+            "type": "integer",
+            "title": "Requirement Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "urls",
+          "requirement_id"
+        ],
+        "title": "ResumeBulkUrlUploadRequest"
+      },
+      "ResumeUrlUploadRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "requirement_id": {
+            "type": "integer",
+            "title": "Requirement Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "requirement_id"
+        ],
+        "title": "ResumeUrlUploadRequest"
+      },
+      "UploadEnqueueResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "queued",
+            "title": "Status"
+          },
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "accepted"
+        ],
+        "title": "UploadEnqueueResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+.env
+!.env.example
+
+# virtual environments
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# tooling
+.mypy_cache/
+.pytest_cache/
+*.sqlite3
+
+# build artifacts
+*.egg-info/
+
+# runtime uploads
+uploads/

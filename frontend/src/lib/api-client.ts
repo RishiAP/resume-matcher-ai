@@ -1,0 +1,498 @@
+import axios from "axios"
+
+import type { components, operations } from "@/generated/api-types"
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:8000"
+
+export const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30_000,
+})
+
+type Schemas = components["schemas"]
+
+export type HealthResponse = Schemas["HealthResponse"]
+export type QueueJobsStatus = Schemas["QueueJobsStatus"]
+export type MatchResultRead = Schemas["MatchResultRead"] & {
+  requirement: {
+    id: number
+    title: string
+  }
+  status: "new" | "processing" | "rejected" | "hired"
+}
+export type UploadEnqueueResponse = Schemas["UploadEnqueueResponse"]
+export type BulkUploadEnqueueResponse = Schemas["BulkUploadEnqueueResponse"]
+export type ResumeUrlUploadRequest = Schemas["ResumeUrlUploadRequest"]
+export type ResumeBulkUrlUploadRequest = Schemas["ResumeBulkUrlUploadRequest"]
+type GeneratedCandidateFilters =
+  operations["list_candidates_api_candidates_get"]["parameters"]["query"]
+
+export type CandidateFilters = GeneratedCandidateFilters & {
+  skill_experience?: string[] | null
+  role_experience?: string[] | null
+  skill_match_mode?: "all" | "any"
+  comment_order?: "desc" | "asc"
+}
+
+export type HRCommentRead = {
+  id: number
+  comment: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type CandidateEducation = {
+  institute: string
+  degree_name: string
+  branch_name?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  year_of_passing?: number | null
+  gpa?: number | null
+}
+
+export type CandidateSkillProfile = {
+  name: string
+  context: "primary" | "secondary" | "project" | "mentioned"
+  experience_months?: number | null
+  experience_years?: number | null
+}
+
+export type CandidateRead = {
+  id: number
+  name?: string | null
+  email?: string | null
+  phone?: string | null
+  location?: string | null
+  current_company?: string | null
+  experience_years?: number | null
+  skills?: string[]
+  highest_degree?: string | null
+  year_of_passing?: number | null
+  gpa?: number | null
+  resume_url?: string | null
+  hr_comments?: HRCommentRead[]
+  matched_skills?: string[]
+  missing_skills?: string[]
+  interview_date?: string | null
+  interview_time?: string | null
+  created_at?: string | null
+  structured_profile?: Record<string, unknown> | null
+  skill_profiles?: CandidateSkillProfile[]
+  experiences?: Array<{
+    role: string
+    company?: string | null
+    start_date?: string | null
+    end_date?: string | null
+    skills_used?: string[]
+  }>
+  projects?: Array<{
+    name: string
+    description?: string | null
+    start_date?: string | null
+    end_date?: string | null
+    skills_used?: string[]
+  }>
+  educations?: CandidateEducation[]
+}
+
+export type CandidateUpdate = {
+  interview_date?: string | null
+  interview_time?: string | null
+}
+
+export type HRCommentWrite = {
+  comment: string
+}
+
+export type RequirementSkillInput = {
+  name: string
+  min_experience_years?: number | null
+}
+
+export type RequirementSkillRead = {
+  name: string
+  min_experience_months?: number | null
+  min_experience_years?: number | null
+}
+
+export type RequirementCreate = {
+  title: string
+  skills: RequirementSkillInput[]
+  min_experience?: number | null
+  max_experience?: number | null
+  location?: string | null
+  min_ctc?: number | null
+  max_ctc?: number | null
+  notes?: string | null
+  qualification?: string | null
+}
+
+export type RequirementRead = {
+  id: number
+  title: string
+  skills: RequirementSkillRead[]
+  required_skills?: string[]
+  min_experience?: number | null
+  max_experience?: number | null
+  location?: string | null
+  min_ctc?: number | null
+  max_ctc?: number | null
+  notes?: string | null
+  qualification?: string | null
+  summary_text?: string | null
+  created_at?: string | null
+}
+
+export type RequirementExtractRequest = {
+  text: string
+}
+
+export type RequirementExtractResponse = {
+  requirement: RequirementCreate
+}
+
+export type CandidateRequirementStatusRead = {
+  candidate_id: number
+  requirement_id: number
+  status: "new" | "processing" | "rejected" | "hired"
+}
+
+export type MatchStatusUpdateRequest = {
+  status: "new" | "processing" | "rejected" | "hired"
+}
+
+export type MatchThresholdStatusRequest = {
+  threshold: number
+  status: "processing" | "rejected" | "hired"
+}
+
+export type BulkStatusUpdateResponse = {
+  requirement_id: number
+  updated_count: number
+  status: "processing" | "rejected" | "hired"
+}
+
+export type RequirementOverviewRead = {
+  requirement_id: number
+  total_current_candidates: number
+  total_rejected_candidates: number
+  total_hired_candidates: number
+  total_processing_candidates: number
+}
+
+function buildCandidateQuery(filters?: CandidateFilters): string {
+  if (!filters) {
+    return ""
+  }
+
+  const params = new URLSearchParams()
+
+  if (filters.skills?.length) {
+    for (const skill of filters.skills) {
+      params.append("skills", skill)
+    }
+  }
+
+  if (typeof filters.min_exp === "number") {
+    params.append("min_exp", String(filters.min_exp))
+  }
+
+  if (typeof filters.max_exp === "number") {
+    params.append("max_exp", String(filters.max_exp))
+  }
+
+  if (filters.location?.trim()) {
+    params.append("location", filters.location.trim())
+  }
+
+  if (filters.skill_experience?.length) {
+    for (const skillExperienceFilter of filters.skill_experience) {
+      params.append("skill_experience", skillExperienceFilter)
+    }
+  }
+
+  if (filters.role_experience?.length) {
+    for (const roleExperienceFilter of filters.role_experience) {
+      params.append("role_experience", roleExperienceFilter)
+    }
+  }
+
+  if (filters.skill_match_mode) {
+    params.append("skill_match_mode", filters.skill_match_mode)
+  }
+
+  if (filters.comment_order) {
+    params.append("comment_order", filters.comment_order)
+  }
+
+  if (typeof filters.requirement_id === "number") {
+    params.append("requirement_id", String(filters.requirement_id))
+  }
+
+  const serialized = params.toString()
+  return serialized ? `?${serialized}` : ""
+}
+
+export async function getSystemHealth(): Promise<HealthResponse> {
+  const response = await apiClient.get<HealthResponse>("/api/health")
+  return response.data
+}
+
+export async function getJobsOverview(): Promise<QueueJobsStatus> {
+  const response = await apiClient.get<QueueJobsStatus>("/api/resume/jobs")
+  return response.data
+}
+
+export async function uploadResumeFile(
+  file: File,
+  requirementId?: number,
+): Promise<UploadEnqueueResponse> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  if (typeof requirementId === "number") {
+    formData.append("requirement_id", String(requirementId))
+  }
+
+  const response = await apiClient.post<UploadEnqueueResponse>(
+    "/api/resume/upload",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  )
+
+  return response.data
+}
+
+export async function uploadResumeFiles(
+  files: File[],
+  requirementId?: number,
+): Promise<BulkUploadEnqueueResponse> {
+  const formData = new FormData()
+  for (const file of files) {
+    formData.append("files", file)
+  }
+
+  if (typeof requirementId === "number") {
+    formData.append("requirement_id", String(requirementId))
+  }
+
+  const response = await apiClient.post<BulkUploadEnqueueResponse>(
+    "/api/resume/upload/bulk",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  )
+
+  return response.data
+}
+
+export async function uploadResumeByUrl(
+  payload: ResumeUrlUploadRequest
+): Promise<UploadEnqueueResponse> {
+  const response = await apiClient.post<UploadEnqueueResponse>(
+    "/api/resume/upload/url",
+    payload
+  )
+  return response.data
+}
+
+export async function uploadResumeUrlsBulk(
+  payload: ResumeBulkUrlUploadRequest
+): Promise<BulkUploadEnqueueResponse> {
+  const response = await apiClient.post<BulkUploadEnqueueResponse>(
+    "/api/resume/upload/url/bulk",
+    payload
+  )
+  return response.data
+}
+
+export async function listCandidates(
+  filters?: CandidateFilters
+): Promise<CandidateRead[]> {
+  const query = buildCandidateQuery(filters)
+  const response = await apiClient.get<CandidateRead[]>(`/api/candidates${query}`)
+  return response.data
+}
+
+export async function updateCandidate(
+  candidateId: number,
+  payload: CandidateUpdate
+): Promise<CandidateRead> {
+  const response = await apiClient.patch<CandidateRead>(
+    `/api/candidates/${candidateId}`,
+    payload
+  )
+  return response.data
+}
+
+export async function addCandidateComment(
+  candidateId: number,
+  payload: HRCommentWrite
+): Promise<HRCommentRead> {
+  const response = await apiClient.post<HRCommentRead>(
+    `/api/candidates/${candidateId}/comments`,
+    payload
+  )
+  return response.data
+}
+
+export async function updateCandidateComment(
+  candidateId: number,
+  commentId: number,
+  payload: HRCommentWrite
+): Promise<HRCommentRead> {
+  const response = await apiClient.patch<HRCommentRead>(
+    `/api/candidates/${candidateId}/comments/${commentId}`,
+    payload
+  )
+  return response.data
+}
+
+export async function listRequirements(): Promise<RequirementRead[]> {
+  const response = await apiClient.get<RequirementRead[]>("/api/requirements")
+  return response.data
+}
+
+export async function createRequirement(
+  payload: RequirementCreate
+): Promise<RequirementRead> {
+  const response = await apiClient.post<RequirementRead>(
+    "/api/requirements",
+    payload
+  )
+  return response.data
+}
+
+export async function updateRequirement(
+  requirementId: number,
+  payload: RequirementCreate
+): Promise<RequirementRead> {
+  const response = await apiClient.patch<RequirementRead>(
+    `/api/requirements/${requirementId}`,
+    payload
+  )
+  return response.data
+}
+
+export async function extractRequirementFromText(
+  payload: RequirementExtractRequest
+): Promise<RequirementCreate> {
+  const response = await apiClient.post<RequirementExtractResponse>(
+    "/api/requirements/extract",
+    payload
+  )
+  return response.data.requirement
+}
+
+export async function runMatching(
+  requirementId: number
+): Promise<MatchResultRead[]> {
+  const response = await apiClient.post<MatchResultRead[]>(
+    `/api/matching/${requirementId}`
+  )
+  return response.data
+}
+
+export async function getMatchingResults(
+  requirementId: number
+): Promise<MatchResultRead[]> {
+  const response = await apiClient.get<MatchResultRead[]>(
+    `/api/matching/${requirementId}`
+  )
+  return response.data
+}
+
+export async function runCandidateMatching(
+  requirementId: number,
+  candidateId: number
+): Promise<MatchResultRead[]> {
+  const response = await apiClient.post<MatchResultRead[]>(
+    `/api/matching/${requirementId}/candidates/${candidateId}`
+  )
+  return response.data
+}
+
+export async function updateMatchStatus(
+  requirementId: number,
+  candidateId: number,
+  payload: MatchStatusUpdateRequest
+): Promise<CandidateRequirementStatusRead> {
+  const response = await apiClient.patch<CandidateRequirementStatusRead>(
+    `/api/matching/${requirementId}/candidates/${candidateId}/status`,
+    payload
+  )
+  return response.data
+}
+
+export async function rejectZeroScoreCandidates(
+  requirementId: number
+): Promise<BulkStatusUpdateResponse> {
+  const response = await apiClient.post<BulkStatusUpdateResponse>(
+    `/api/matching/${requirementId}/bulk/reject-zero`
+  )
+  return response.data
+}
+
+export async function applyThresholdStatus(
+  requirementId: number,
+  payload: MatchThresholdStatusRequest
+): Promise<BulkStatusUpdateResponse> {
+  const response = await apiClient.post<BulkStatusUpdateResponse>(
+    `/api/matching/${requirementId}/bulk/threshold`,
+    payload
+  )
+  return response.data
+}
+
+export async function getRequirementOverview(
+  requirementId: number
+): Promise<RequirementOverviewRead> {
+  const response = await apiClient.get<RequirementOverviewRead>(
+    `/api/matching/overview/${requirementId}`
+  )
+  return response.data
+}
+
+export function getApiErrorMessage(error: unknown): string {
+  if (!axios.isAxiosError(error)) {
+    return "Something went wrong. Please try again."
+  }
+
+  const detail = (error.response?.data as { detail?: unknown } | undefined)?.detail
+
+  if (typeof detail === "string") {
+    return detail
+  }
+
+  if (Array.isArray(detail) && detail.length) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === "string") {
+          return item
+        }
+
+        if (item && typeof item === "object" && "msg" in item) {
+          const value = item.msg
+          return typeof value === "string" ? value : null
+        }
+
+        return null
+      })
+      .filter((message): message is string => Boolean(message))
+
+    if (messages.length) {
+      return messages.join(", ")
+    }
+  }
+
+  return error.message || "Request failed."
+}
