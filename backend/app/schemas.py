@@ -82,12 +82,12 @@ class BatchUploadStatus(BaseModel):
 
 class ResumeUrlUploadRequest(BaseModel):
     url: AnyHttpUrl
-    requirement_id: int
+    requirement_id: int | None = None
 
 
 class ResumeBulkUrlUploadRequest(BaseModel):
     urls: list[AnyHttpUrl] = Field(min_length=1)
-    requirement_id: int
+    requirement_id: int | None = None
 
 
 class UploadEnqueueResponse(BaseModel):
@@ -203,6 +203,10 @@ class CandidateRead(BaseModel):
     hr_comments: list[HRCommentRead] = Field(default_factory=list)
     matched_skills: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
+    # Per-requirement status when `requirement_id` is passed to the list endpoint.
+    # - `null` when no requirement_id was requested
+    # - `"not_applied"` when the candidate has no CandidateStatus for the requirement
+    requirement_status: Literal["not_applied", "new", "processing", "rejected", "hired"] | None = None
     interview_date: date | None = None
     interview_time: str | None = None
     created_at: datetime | None = None
@@ -375,4 +379,4 @@ class MatchResultRead(BaseModel):
     requirement: RequirementMatchView
     score: float
     reason: str
-    status: Literal["new", "processing", "rejected", "hired"]
+    status: Literal["not_applied", "new", "processing", "rejected", "hired"]

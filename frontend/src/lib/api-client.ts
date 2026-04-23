@@ -19,7 +19,7 @@ export type MatchResultRead = Schemas["MatchResultRead"] & {
     id: number
     title: string
   }
-  status: "new" | "processing" | "rejected" | "hired"
+  status: "not_applied" | "new" | "processing" | "rejected" | "hired"
 }
 export type UploadEnqueueResponse = Schemas["UploadEnqueueResponse"]
 export type BulkUploadEnqueueResponse = Schemas["BulkUploadEnqueueResponse"]
@@ -95,6 +95,8 @@ export type CandidateRead = {
     skills_used?: string[]
   }>
   educations?: CandidateEducation[]
+  /** Per-requirement status when `requirement_id` is passed to the list endpoint. */
+  requirement_status?: "not_applied" | "new" | "processing" | "rejected" | "hired" | null
 }
 
 export type CandidateUpdate = {
@@ -395,9 +397,11 @@ export async function extractRequirementFromText(
 
 export async function runMatching(
   requirementId: number
+  , matchAll?: boolean
 ): Promise<MatchResultRead[]> {
+  const query = matchAll ? "?match_all=true" : ""
   const response = await apiClient.post<MatchResultRead[]>(
-    `/api/matching/${requirementId}`
+    `/api/matching/${requirementId}${query}`
   )
   return response.data
 }

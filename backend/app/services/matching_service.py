@@ -31,6 +31,7 @@ class MatchingService:
         db: Session,
         requirement_id: int,
         candidate_id: int | None = None,
+        match_all: bool = False,
     ) -> list[dict]:
         requirement = (
             db.query(Requirement)
@@ -79,23 +80,27 @@ class MatchingService:
         required_skill_names = [link.skill.name for link in required_skill_links]
 
         if candidate_id is None:
-            # Only candidates who have been linked to this requirement with status 'new'
-            eligible_candidate_ids = [
-                row.id
-                for row in db.execute(
-                    text(
-                        """
-                        SELECT c.id
-                        FROM candidate c
-                        JOIN candidate_status cs
-                          ON cs.candidate_id = c.id
-                         AND cs.requirement_id = :requirement_id
-                         AND cs.status = 'new'
-                        """
-                    ),
-                    {"requirement_id": requirement_id},
-                ).fetchall()
-            ]
+            if match_all:
+                # All candidates are eligible when match_all is requested
+                eligible_candidate_ids = [row[0] for row in db.execute(text("SELECT id FROM candidate")).fetchall()]
+            else:
+                # Only candidates who have been linked to this requirement with status 'new'
+                eligible_candidate_ids = [
+                    row.id
+                    for row in db.execute(
+                        text(
+                            """
+                            SELECT c.id
+                            FROM candidate c
+                            JOIN candidate_status cs
+                              ON cs.candidate_id = c.id
+                             AND cs.requirement_id = :requirement_id
+                             AND cs.status = 'new'
+                            """
+                        ),
+                        {"requirement_id": requirement_id},
+                    ).fetchall()
+                ]
         else:
             eligible_candidate_ids = [candidate_id]
 
@@ -106,59 +111,104 @@ class MatchingService:
         keyword_query = " ".join(required_skill_names).strip()
         kw_rows = []
         if keyword_query and candidate_id is None:
-            # Rank only candidates whose status for this requirement is 'new'
-            kw_rows = db.execute(
-                text(
-                    """
-                    SELECT c.id,
-                        ROW_NUMBER() OVER (
-                            ORDER BY ts_rank(
-                                (
-                                    to_tsvector('english', COALESCE(c.summary_text, '')) ||
-                                    to_tsvector('english', COALESCE(string_agg(s.name, ' '), ''))
-                                ),
-                                plainto_tsquery('english', :query)
-                            ) DESC
-                        ) AS kw_rank
-                    FROM candidate c
-                    JOIN candidate_status cst
-                      ON cst.candidate_id = c.id
-                     AND cst.requirement_id = :requirement_id
-                     AND cst.status = 'new'
-                    LEFT JOIN candidate_skill cs ON cs.candidate_id = c.id
-                    LEFT JOIN skill s ON s.id = cs.skill_id
-                    GROUP BY c.id, c.summary_text
-                    HAVING (
-                        to_tsvector('english', COALESCE(c.summary_text, '')) ||
-                        to_tsvector('english', COALESCE(string_agg(s.name, ' '), ''))
-                    ) @@ plainto_tsquery('english', :query)
-                    """
-                ),
-                {"query": keyword_query, "requirement_id": requirement_id},
-            ).fetchall()
+            if match_all:
+                kw_rows = db.execute(
+                    text(
+                        """
+                        SELECT c.id,
+                            ROW_NUMBER() OVER (
+                                ORDER BY ts_rank(
+                                    (
+                                        to_tsvector('english', COALESCE(c.summary_text, '')) ||
+                                        to_tsvector('english', COALESCE(string_agg(s.name, ' '), ''))
+                                    ),
+                                    plainto_tsquery('english', :query)
+                                ) DESC
+                            ) AS kw_rank
+                        FROM candidate c
+                        LEFT JOIN candidate_skill cs ON cs.candidate_id = c.id
+                        LEFT JOIN skill s ON s.id = cs.skill_id
+                        GROUP BY c.id, c.summary_text
+                        HAVING (
+                            to_tsvector('english', COALESCE(c.summary_text, '')) ||
+                            to_tsvector('english', COALESCE(string_agg(s.name, ' '), ''))
+                        ) @@ plainto_tsquery('english', :query)
+                        """
+                    ),
+                    {"query": keyword_query},
+                ).fetchall()
+            else:
+                # Rank only candidates whose status for this requirement is 'new'
+                kw_rows = db.execute(
+                    text(
+                        """
+                        SELECT c.id,
+                            ROW_NUMBER() OVER (
+                                ORDER BY ts_rank(
+                                    (
+                                        to_tsvector('english', COALESCE(c.summary_text, '')) ||
+                                        to_tsvector('english', COALESCE(string_agg(s.name, ' '), ''))
+                                    ),
+                                    plainto_tsquery('english', :query)
+                                ) DESC
+                            ) AS kw_rank
+                        FROM candidate c
+                        JOIN candidate_status cst
+                          ON cst.candidate_id = c.id
+                         AND cst.requirement_id = :requirement_id
+                         AND cst.status = 'new'
+                        LEFT JOIN candidate_skill cs ON cs.candidate_id = c.id
+                        LEFT JOIN skill s ON s.id = cs.skill_id
+                        GROUP BY c.id, c.summary_text
+                        HAVING (
+                            to_tsvector('english', COALESCE(c.summary_text, '')) ||
+                            to_tsvector('english', COALESCE(string_agg(s.name, ' '), ''))
+                        ) @@ plainto_tsquery('english', :query)
+                        """
+                    ),
+                    {"query": keyword_query, "requirement_id": requirement_id},
+                ).fetchall()
 
         vec_rows = []
         if candidate_id is None:
-            # Vector ranking among candidates in 'new' status for this requirement
-            vec_rows = db.execute(
-                text(
-                    """
-                    SELECT c.id,
-                        ROW_NUMBER() OVER (
-                            ORDER BY c.embedding <=> CAST(:emb AS vector)
-                        ) AS vec_rank
-                    FROM candidate c
-                    JOIN candidate_status cst
-                      ON cst.candidate_id = c.id
-                     AND cst.requirement_id = :requirement_id
-                     AND cst.status = 'new'
-                    WHERE c.embedding IS NOT NULL
-                    ORDER BY c.embedding <=> CAST(:emb AS vector)
-                    LIMIT 200
-                    """
-                ),
-                {"emb": embedding_str, "requirement_id": requirement_id},
-            ).fetchall()
+            if match_all:
+                # Vector ranking among all candidates (with embeddings)
+                vec_rows = db.execute(
+                    text(
+                        """
+                        SELECT c.id,
+                            ROW_NUMBER() OVER (
+                                ORDER BY c.embedding <=> CAST(:emb AS vector)
+                            ) AS vec_rank
+                        FROM candidate c
+                        WHERE c.embedding IS NOT NULL
+                        ORDER BY c.embedding <=> CAST(:emb AS vector)
+                        LIMIT 200
+                        """
+                    ),
+                    {"emb": embedding_str},
+                ).fetchall()
+            else:
+                # Vector ranking among candidates in 'new' status for this requirement
+                vec_rows = db.execute(
+                    text(
+                        """
+                        SELECT c.id,
+                            ROW_NUMBER() OVER (
+                                ORDER BY c.embedding <=> CAST(:emb AS vector)
+                            ) AS vec_rank
+                        FROM candidate c
+                        JOIN candidate_status cst
+                          ON cst.candidate_id = c.id
+                         AND cst.requirement_id = :requirement_id
+                         AND cst.status = 'new'
+                        WHERE c.embedding IS NOT NULL
+                        ORDER BY c.embedding <=> CAST(:emb AS vector)
+                        LIMIT 200
+                        """
+                    ),
+                    {"emb": embedding_str, "requirement_id": requirement_id},
+                ).fetchall()
 
         rrf: dict[int, float] = {}
         for row in kw_rows:
@@ -264,7 +314,7 @@ class MatchingService:
         )
 
         status_map = {
-            row.candidate_id: MatchingService._status_value(row.status) or CandidateStatusEnum.NEW.value
+            row.candidate_id: MatchingService._status_value(row.status)
             for row in db.query(CandidateStatus)
             .filter(CandidateStatus.requirement_id == requirement_id)
             .all()
@@ -292,7 +342,10 @@ class MatchingService:
                 },
                 "score": MatchingService._to_float(match.score),
                 "reason": match.reason or "",
-                "status": status_map.get(candidate.id, "new"),
+                # When a candidate has no CandidateStatus for this requirement, report
+                # that they have not applied rather than defaulting to 'new'. This
+                # keeps matching results consistent with listing behavior.
+                "status": status_map.get(candidate.id, "not_applied"),
             }
             for match, candidate in rows
         ]

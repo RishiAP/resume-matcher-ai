@@ -714,6 +714,18 @@
               "type": "integer",
               "title": "Requirement Id"
             }
+          },
+          {
+            "name": "match_all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "If true, run matching across all candidates (not only 'new' status)",
+              "default": false,
+              "title": "Match All"
+            },
+            "description": "If true, run matching across all candidates (not only 'new' status)"
           }
         ],
         "responses": {
@@ -1040,6 +1052,46 @@
         }
       }
     },
+    "/api/rate-limit/usage": {
+      "get": {
+        "tags": [
+          "Rate Limit"
+        ],
+        "summary": "Get Rate Limit Usage",
+        "description": "Get current rate limit usage statistics.",
+        "operationId": "get_rate_limit_usage_api_rate_limit_usage_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rate-limit/reset-test": {
+      "post": {
+        "tags": [
+          "Rate Limit"
+        ],
+        "summary": "Reset Test Counters",
+        "description": "Reset test counters (for development only).",
+        "operationId": "reset_test_counters_api_rate_limit_reset_test_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -1069,14 +1121,20 @@
             "title": "File"
           },
           "requirement_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Requirement Id"
           }
         },
         "type": "object",
         "required": [
-          "file",
-          "requirement_id"
+          "file"
         ],
         "title": "Body_upload_resume_api_resume_upload_post"
       },
@@ -1091,14 +1149,20 @@
             "title": "Files"
           },
           "requirement_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Requirement Id"
           }
         },
         "type": "object",
         "required": [
-          "files",
-          "requirement_id"
+          "files"
         ],
         "title": "Body_upload_resume_bulk_api_resume_upload_bulk_post"
       },
@@ -1576,6 +1640,24 @@
             "type": "array",
             "title": "Missing Skills"
           },
+          "requirement_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "not_applied",
+                  "new",
+                  "processing",
+                  "rejected",
+                  "hired"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement Status"
+          },
           "interview_date": {
             "anyOf": [
               {
@@ -1900,6 +1982,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "not_applied",
               "new",
               "processing",
               "rejected",
@@ -2368,14 +2451,20 @@
             "title": "Urls"
           },
           "requirement_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Requirement Id"
           }
         },
         "type": "object",
         "required": [
-          "urls",
-          "requirement_id"
+          "urls"
         ],
         "title": "ResumeBulkUrlUploadRequest"
       },
@@ -2388,14 +2477,20 @@
             "title": "Url"
           },
           "requirement_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Requirement Id"
           }
         },
         "type": "object",
         "required": [
-          "url",
-          "requirement_id"
+          "url"
         ],
         "title": "ResumeUrlUploadRequest"
       },

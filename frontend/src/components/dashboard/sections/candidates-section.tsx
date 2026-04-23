@@ -877,7 +877,11 @@ export function CandidatesSection() {
 	})
 
 	const activeRequirementId =
-		selectedRequirementId ?? requirementsQuery.data?.[0]?.id ?? null
+		selectedRequirementId === -1
+			? null
+			: selectedRequirementId ?? requirementsQuery.data?.[0]?.id ?? null
+
+	const showStatusColumn = selectedRequirementId !== -1 && activeRequirementId !== null
 
 	const filterForm = useForm<CandidateFilterValues>({
 		resolver: zodResolver(candidateFiltersSchema),
@@ -1077,10 +1081,15 @@ export function CandidatesSection() {
 							value={
 								activeRequirementId !== null
 									? activeRequirementId.toString()
-									: ""
+									: "ALL"
 							}
 							onValueChange={(value) => {
-								setSelectedRequirementId(Number.parseInt(value, 10))
+								if (value === "ALL") {
+									setSelectedRequirementId(-1)
+									return
+								}
+								const parsed = Number(value)
+								setSelectedRequirementId(Number.isFinite(parsed) ? parsed : null)
 							}}
 							disabled={
 								requirementsQuery.isLoading ||
@@ -1097,6 +1106,7 @@ export function CandidatesSection() {
 								/>
 							</SelectTrigger>
 							<SelectContent>
+								<SelectItem value="ALL">All candidates</SelectItem>
 								{requirementsQuery.data?.map((requirement) => (
 									<SelectItem
 										key={requirement.id}
@@ -1305,6 +1315,7 @@ export function CandidatesSection() {
 									<TableHead>Email</TableHead>
 									<TableHead>Phone Number</TableHead>
 									<TableHead>Qualification</TableHead>
+									{showStatusColumn && <TableHead>Status</TableHead>}
 									<TableHead className="text-right">Action</TableHead>
 								</TableRow>
 							</TableHeader>
@@ -1366,6 +1377,15 @@ export function CandidatesSection() {
 										<TableCell>{candidate.email ?? "-"}</TableCell>
 										<TableCell>{candidate.phone ?? "-"}</TableCell>
 										<TableCell>{candidate.highest_degree ?? "-"}</TableCell>
+										{showStatusColumn ? (
+											<TableCell>
+												{candidate.requirement_status == null
+													? "-"
+													: candidate.requirement_status === "not_applied"
+													? "Not applied"
+													: candidate.requirement_status.charAt(0).toUpperCase() + candidate.requirement_status.slice(1)}
+											</TableCell>
+										) : null}
 										<TableCell className="text-right">
 											<div className="flex justify-end gap-2">
 												<Button

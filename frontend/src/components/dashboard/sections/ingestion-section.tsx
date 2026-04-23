@@ -54,6 +54,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 
 const requirementSelectionSchema = z.object({
 	requirementId: z
@@ -119,6 +120,7 @@ export function ResumeIngestionSection() {
 	const [notification, setNotification] = useState<ToastState | null>(null)
 	const [selectedRequirementId, setSelectedRequirementId] =
 		useState<number | null>(null)
+	const [bindToRequirement, setBindToRequirement] = useState<boolean>(true)
 	const [requirementError, setRequirementError] = useState<string | null>(null)
 	const singleFileInputRef = useRef<HTMLInputElement | null>(null)
 	const bulkFileInputRef = useRef<HTMLInputElement | null>(null)
@@ -190,11 +192,12 @@ export function ResumeIngestionSection() {
 				throw new Error("Please choose a file.")
 			}
 
-			if (activeRequirementId === null) {
+			if (bindToRequirement && activeRequirementId === null) {
 				throw new Error("Please select a requirement before uploading resumes.")
 			}
 
-			return uploadResumeFile(values.file, activeRequirementId)
+			const reqId = bindToRequirement ? (activeRequirementId ?? undefined) : undefined
+			return uploadResumeFile(values.file, reqId)
 		},
 		onSuccess: (response) => {
 			onUploadSuccess("Single resume upload queued", response)
@@ -214,10 +217,11 @@ export function ResumeIngestionSection() {
 
 	const uploadBulkFileMutation = useMutation({
 		mutationFn: (values: UploadBulkFileValues) => {
-			if (activeRequirementId === null) {
+			if (bindToRequirement && activeRequirementId === null) {
 				throw new Error("Please select a requirement before uploading resumes.")
 			}
-			return uploadResumeFiles(values.files, activeRequirementId)
+			const reqId = bindToRequirement ? (activeRequirementId ?? undefined) : undefined
+			return uploadResumeFiles(values.files, reqId)
 		},
 		onSuccess: (response) => {
 			onUploadSuccess("Bulk file upload queued", response)
@@ -237,12 +241,13 @@ export function ResumeIngestionSection() {
 
 	const uploadSingleUrlMutation = useMutation({
 		mutationFn: (values: UploadSingleUrlValues) => {
-			if (activeRequirementId === null) {
+			if (bindToRequirement && activeRequirementId === null) {
 				throw new Error("Please select a requirement before uploading resumes.")
 			}
+			const reqId = bindToRequirement ? (activeRequirementId ?? undefined) : undefined
 			return uploadResumeByUrl({
 				url: values.url,
-				requirement_id: activeRequirementId,
+				requirement_id: reqId,
 			})
 		},
 		onSuccess: (response) => {
@@ -260,12 +265,13 @@ export function ResumeIngestionSection() {
 
 	const uploadBulkUrlMutation = useMutation({
 		mutationFn: (values: UploadBulkUrlValues) => {
-			if (activeRequirementId === null) {
+			if (bindToRequirement && activeRequirementId === null) {
 				throw new Error("Please select a requirement before uploading resumes.")
 			}
+			const reqId = bindToRequirement ? (activeRequirementId ?? undefined) : undefined
 			return uploadResumeUrlsBulk({
 				urls: parseResumeUrls(values.urlsText),
-				requirement_id: activeRequirementId,
+				requirement_id: reqId,
 			})
 		},
 		onSuccess: (response) => {
@@ -327,60 +333,76 @@ export function ResumeIngestionSection() {
 
 			<Card>
 				<CardHeader>
-					<CardTitle>Requirement (Required)</CardTitle>
+					<CardTitle>Resume Binding</CardTitle>
 					<CardDescription>
-						All uploads must be linked to a requirement; candidates
-						will be marked as <span className="font-medium">new</span>
-						for the selected role.
+						Control whether uploads are associated to a requirement.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<Field orientation="responsive">
-						<FieldLabel>Requirement</FieldLabel>
-						<FieldDescription>
-							Required. Choose the role candidates are applying for.
-						</FieldDescription>
-						<Select
-							value={
-								activeRequirementId !== null
-									? activeRequirementId.toString()
-									: ""
-							}
-							onValueChange={(value) => {
-								setSelectedRequirementId(Number.parseInt(value, 10))
-								setRequirementError(null)
-							}}
-							disabled={
-								requirementsQuery.isLoading ||
-								!requirementsQuery.data?.length
-							}
-						>
-							<SelectTrigger className="w-full max-w-md">
-								<SelectValue
-									placeholder={
-										requirementsQuery.data?.length
-											? "Select a requirement"
-											: "No requirements available"
-									}
-								/>
-							</SelectTrigger>
-							<SelectContent>
-								{requirementsQuery.data?.map((requirement) => (
-									<SelectItem
-										key={requirement.id}
-										value={requirement.id.toString()}
-									>
-										{requirement.title}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						<FieldError
-							errors={
-								requirementError ? [{ message: requirementError }] : []
-							}
-						/>
+						<div className="flex items-center justify-between gap-4">
+							<div>
+								<FieldLabel>Bind uploads to requirement <Switch checked={bindToRequirement} onCheckedChange={(val) => setBindToRequirement(Boolean(val))} size="sm" /></FieldLabel>
+								<FieldDescription>
+									When enabled, uploads are associated to the selected requirement and candidates will be marked <span className="font-medium">new</span>.
+								</FieldDescription>
+							</div>
+						</div>
 					</Field>
+
+					{bindToRequirement ? (
+						<Field orientation="responsive">
+							<FieldLabel>Requirement</FieldLabel>
+							<FieldDescription>
+								Required. Choose the role candidates are applying for.
+							</FieldDescription>
+							<Select
+								value={
+									activeRequirementId !== null
+										? activeRequirementId.toString()
+										: ""
+								}
+								onValueChange={(value) => {
+									const parsed = Number(value)
+									setSelectedRequirementId(Number.isFinite(parsed) ? parsed : null)
+									setRequirementError(null)
+								}}
+								disabled={
+									requirementsQuery.isLoading ||
+									!requirementsQuery.data?.length
+								}
+							>
+								<SelectTrigger className="w-full max-w-md">
+									<SelectValue
+										placeholder={
+											requirementsQuery.data?.length
+												? "Select a requirement"
+												: "No requirements available"
+										}
+									/>
+								</SelectTrigger>
+								<SelectContent>
+									{requirementsQuery.data?.map((requirement) => (
+										<SelectItem
+											key={requirement.id}
+											value={requirement.id.toString()}
+										>
+											{requirement.title}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							<FieldError
+								errors={
+									requirementError ? [{ message: requirementError }] : []
+								}
+							/>
+						</Field>
+					) : (
+						<div className="rounded-md border border-border/60 bg-muted/10 p-3">
+							<p className="text-sm text-muted-foreground">Uploads will not be associated with a requirement.</p>
+						</div>
+					)}
 				</CardContent>
 			</Card>
 
@@ -404,8 +426,8 @@ export function ResumeIngestionSection() {
 							<form
 								className="space-y-4"
 								onSubmit={singleFileForm.handleSubmit((values) => {
-									const requirementId = validateRequirement()
-									if (!requirementId) return
+									const requirementId = bindToRequirement ? validateRequirement() : undefined
+									if (bindToRequirement && !requirementId) return
 									uploadSingleFileMutation.mutate(values)
 								})}
 							>
@@ -424,7 +446,7 @@ export function ResumeIngestionSection() {
 												type="file"
 												accept=".pdf,.doc,.docx"
 												aria-invalid={fieldState.invalid}
-												disabled={!requirementsQuery.data?.length}
+												disabled={!requirementsQuery.data?.length && bindToRequirement}
 												onBlur={field.onBlur}
 												onChange={(event) => {
 													field.onChange(event.target.files?.[0])
@@ -442,7 +464,7 @@ export function ResumeIngestionSection() {
 										<Button
 											type="submit"
 											disabled={
-												!requirementsQuery.data?.length ||
+												(!requirementsQuery.data?.length && bindToRequirement) ||
 												uploadSingleFileMutation.isPending
 											}
 										>
@@ -474,8 +496,8 @@ export function ResumeIngestionSection() {
 							<form
 								className="space-y-4"
 								onSubmit={bulkFileForm.handleSubmit((values) => {
-									const requirementId = validateRequirement()
-									if (!requirementId) return
+									const requirementId = bindToRequirement ? validateRequirement() : undefined
+									if (bindToRequirement && !requirementId) return
 									uploadBulkFileMutation.mutate(values)
 								})}
 							>
@@ -493,7 +515,7 @@ export function ResumeIngestionSection() {
 												multiple
 												accept=".pdf,.doc,.docx"
 												aria-invalid={fieldState.invalid}
-													disabled={!requirementsQuery.data?.length}
+													disabled={!requirementsQuery.data?.length && bindToRequirement}
 												onBlur={field.onBlur}
 												onChange={(event) => {
 													field.onChange(Array.from(event.target.files ?? []))
@@ -511,7 +533,7 @@ export function ResumeIngestionSection() {
 										<Button
 											type="submit"
 											disabled={
-												!requirementsQuery.data?.length ||
+												(!requirementsQuery.data?.length && bindToRequirement) ||
 												uploadBulkFileMutation.isPending
 											}
 										>
@@ -543,8 +565,8 @@ export function ResumeIngestionSection() {
 							<form
 								className="space-y-4"
 								onSubmit={singleUrlForm.handleSubmit((values) => {
-									const requirementId = validateRequirement()
-									if (!requirementId) return
+									const requirementId = bindToRequirement ? validateRequirement() : undefined
+									if (bindToRequirement && !requirementId) return
 									uploadSingleUrlMutation.mutate(values)
 								})}
 							>
@@ -560,7 +582,7 @@ export function ResumeIngestionSection() {
 												type="url"
 												placeholder="e.g. https://example.com/resume.pdf"
 												aria-invalid={fieldState.invalid}
-												disabled={!requirementsQuery.data?.length}
+												disabled={!requirementsQuery.data?.length && bindToRequirement}
 											/>
 											<FieldDescription>
 												URL must be publicly reachable by the backend service.
@@ -574,7 +596,7 @@ export function ResumeIngestionSection() {
 										<Button
 											type="submit"
 											disabled={
-												!requirementsQuery.data?.length ||
+												(!requirementsQuery.data?.length && bindToRequirement) ||
 												uploadSingleUrlMutation.isPending
 											}
 										>
@@ -606,8 +628,8 @@ export function ResumeIngestionSection() {
 							<form
 								className="space-y-4"
 								onSubmit={bulkUrlForm.handleSubmit((values) => {
-									const requirementId = validateRequirement()
-									if (!requirementId) return
+									const requirementId = bindToRequirement ? validateRequirement() : undefined
+									if (bindToRequirement && !requirementId) return
 									uploadBulkUrlMutation.mutate(values)
 								})}
 							>
@@ -626,7 +648,7 @@ export function ResumeIngestionSection() {
 													"e.g. https://example.com/candidate-a.pdf",
 													"e.g. https://example.com/candidate-b.docx",
 												].join("\n")}
-												disabled={!requirementsQuery.data?.length}
+												disabled={!requirementsQuery.data?.length && bindToRequirement}
 											/>
 											<FieldDescription>
 												Enter one resume URL per line.
@@ -640,7 +662,7 @@ export function ResumeIngestionSection() {
 										<Button
 											type="submit"
 											disabled={
-												!requirementsQuery.data?.length ||
+												(!requirementsQuery.data?.length && bindToRequirement) ||
 												uploadBulkUrlMutation.isPending
 											}
 										>

@@ -148,12 +148,10 @@ class CandidateService:
         skill_thresholds = CandidateService._parse_threshold_filters(skill_experience)
         role_thresholds = CandidateService._parse_threshold_filters(role_experience)
 
-        if requirement_id is not None:
-            query = query.join(
-                CandidateStatus,
-                (CandidateStatus.candidate_id == Candidate.id)
-                & (CandidateStatus.requirement_id == requirement_id),
-            )
+        # Do not filter out candidates by requirement — we want to return all
+        # candidates and attach per-requirement status when requested. An
+        # additional single query below will fetch statuses for the returned
+        # candidate ids to avoid N+1 queries.
 
         if min_exp is not None:
             query = query.filter(Candidate.experience_years >= min_exp)
@@ -164,6 +162,24 @@ class CandidateService:
 
         rows = query.order_by(Candidate.created_at.desc()).all()
 
+        # If a requirement_id is provided, fetch any existing CandidateStatus
+        # rows for the returned candidates in a single query and attach a
+        # `requirement_status` value to each returned dict below. If no
+        # CandidateStatus exists for a candidate for the given requirement,
+        # we'll return the sentinel value 'not_applied'. When no
+        # requirement_id is provided, `requirement_status` will be null.
+        requirement_status_map: dict[int, str] = {}
+        if requirement_id is not None and rows:
+            candidate_ids = [r.id for r in rows]
+            status_rows = (
+                db.query(CandidateStatus.candidate_id, CandidateStatus.status)
+                .filter(
+                    CandidateStatus.requirement_id == requirement_id,
+                    CandidateStatus.candidate_id.in_(candidate_ids),
+                )
+                .all()
+            )
+            requirement_status_map = {r.candidate_id: r.status for r in status_rows}
         if normalized_skills:
             skill_set = set(normalized_skills)
             if skill_match_mode == "all":
@@ -196,14 +212,20 @@ class CandidateService:
                 )
             ]
 
-        return [
-            CandidateService._to_dict(
+        result: list[dict] = []
+        for row in rows:
+            item = CandidateService._to_dict(
                 row,
                 selected_skills=normalized_skills,
                 comment_order=comment_order,
             )
-            for row in rows
-        ]
+            if requirement_id is None:
+                item["requirement_status"] = None
+            else:
+                item["requirement_status"] = requirement_status_map.get(row.id, "not_applied")
+            result.append(item)
+
+        return result
 
     @staticmethod
     def update(db: Session, candidate_id: int, updates: dict) -> dict:

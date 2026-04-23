@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -18,9 +18,10 @@ router = APIRouter()
 @router.post("/{requirement_id}", response_model=list[MatchResultRead])
 def run_matching(
     requirement_id: int,
+    match_all: bool = Query(False, description="If true, run matching across all candidates (not only 'new' status)"),
     db: Session = Depends(get_db),
 ) -> list[MatchResultRead]:
-    rows = MatchingService.find_matches(db, requirement_id)
+    rows = MatchingService.find_matches(db, requirement_id, match_all=match_all)
     return [MatchResultRead.model_validate(row) for row in rows]
 
 

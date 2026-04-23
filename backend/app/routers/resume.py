@@ -42,7 +42,7 @@ def _queue_counts() -> QueueJobsStatus:
 @router.post("/upload", response_model=UploadEnqueueResponse, status_code=status.HTTP_202_ACCEPTED)
 async def upload_resume(
     file: UploadFile = File(...),
-    requirement_id: int = Form(...),
+    requirement_id: int | None = Form(None),
     db: Session = Depends(get_db),
 ) -> UploadEnqueueResponse:
     if not file.filename:
@@ -52,7 +52,7 @@ async def upload_resume(
     if not contents:
         raise ValueError("Uploaded file is empty")
 
-    if db.get(Requirement, requirement_id) is None:
+    if requirement_id is not None and db.get(Requirement, requirement_id) is None:
         raise ValueError("Requirement not found for the provided requirement_id")
 
     file_path, _ = ResumeService.save_uploaded_file(contents, file.filename)
@@ -67,7 +67,7 @@ async def upload_resume(
 )
 async def upload_resume_bulk(
     files: list[UploadFile] = File(...),
-    requirement_id: int = Form(...),
+    requirement_id: int | None = Form(None),
     db: Session = Depends(get_db),
 ) -> BulkUploadEnqueueResponse:
     if not files:
@@ -77,7 +77,7 @@ async def upload_resume_bulk(
     rejected = 0
     errors: list[str] = []
 
-    if db.get(Requirement, requirement_id) is None:
+    if requirement_id is not None and db.get(Requirement, requirement_id) is None:
         raise ValueError("Requirement not found for the provided requirement_id")
 
     for file in files:
@@ -113,7 +113,7 @@ def upload_resume_by_url(
     data: ResumeUrlUploadRequest,
     db: Session = Depends(get_db),
 ) -> UploadEnqueueResponse:
-    if db.get(Requirement, data.requirement_id) is None:
+    if data.requirement_id is not None and db.get(Requirement, data.requirement_id) is None:
         raise ValueError("Requirement not found for the provided requirement_id")
 
     process_url_task.delay(str(data.url), data.requirement_id)
@@ -131,7 +131,7 @@ def upload_resume_urls_bulk(
 ) -> BulkUploadEnqueueResponse:
     accepted = 0
 
-    if db.get(Requirement, data.requirement_id) is None:
+    if data.requirement_id is not None and db.get(Requirement, data.requirement_id) is None:
         raise ValueError("Requirement not found for the provided requirement_id")
 
     for url in data.urls:

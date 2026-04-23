@@ -40,6 +40,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import {
 	Table,
 	TableBody,
@@ -76,6 +77,7 @@ export function MatchingSection() {
 	const [localStatuses, setLocalStatuses] = useState<
 		Record<number, MatchResultRead["status"]>
 	>({})
+	const [matchAll, setMatchAll] = useState<boolean>(false)
 
 	const requirementsQuery = useQuery({
 		queryKey: requirementsQueryKey,
@@ -108,7 +110,7 @@ export function MatchingSection() {
 		mutationFn: async (variables: {
 			requirementId: number
 			candidateId: number
-			status: MatchResultRead["status"]
+			status: "new" | "processing" | "rejected" | "hired"
 		}) =>
 			updateMatchStatus(variables.requirementId, variables.candidateId, {
 				status: variables.status,
@@ -207,11 +209,12 @@ export function MatchingSection() {
 	})
 
 	const runMatchingMutation = useMutation({
-		mutationFn: (requirementId: number) => runMatching(requirementId),
-		onSuccess: (results, requirementId) => {
-			setSelectedRequirementId(requirementId)
+		mutationFn: (variables: { requirementId: number; matchAll?: boolean }) =>
+			runMatching(variables.requirementId, variables.matchAll),
+		onSuccess: (results, variables) => {
+			setSelectedRequirementId(variables.requirementId)
 			setLocalStatuses({})
-			queryClient.setQueryData(["matching", requirementId], results)
+			queryClient.setQueryData(["matching", variables.requirementId], results)
 			setNotification({
 				type: "success",
 				title: "Matching completed",
@@ -235,6 +238,14 @@ export function MatchingSection() {
 
 	const rankedCandidates = matchResultsQuery.data ?? []
 
+	function scoreColorClass(percent: number) {
+		if (percent >= 75) return "text-emerald-600 font-semibold"
+		if (percent >= 50) return "text-amber-600 font-semibold"
+		return "text-destructive font-semibold"
+	}
+
+	const showStatusColumn = !matchAll && effectiveRequirementId !== null
+
 	return (
 		<div className="space-y-6">
 			<Notification
@@ -257,57 +268,40 @@ export function MatchingSection() {
 								Choose the role profile to score and rank candidates.
 							</FieldDescription>
 						</FieldContent>
-						<Select
-							value={effectiveRequirementId ? String(effectiveRequirementId) : ""}
-							onValueChange={(value) => {
-								const parsed = Number(value)
-								setSelectedRequirementId(Number.isFinite(parsed) ? parsed : null)
-							}}
-						>
-							<SelectTrigger id="matching-requirement" className="w-full md:w-80">
-								<SelectValue placeholder="Select requirement" />
-							</SelectTrigger>
-							<SelectContent>
-								{requirementsQuery.data?.map((requirement) => (
-									<SelectItem key={requirement.id} value={String(requirement.id)}>
-										#{requirement.id} - {requirement.title}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
+						<div className="w-full max-w-5xl">
+							<div className="flex items-center gap-2 min-w-0">
+								<div className="flex-1 min-w-0">
+									<Select
+										value={effectiveRequirementId ? String(effectiveRequirementId) : ""}
+										onValueChange={(value) => {
+											const parsed = Number(value)
+											setSelectedRequirementId(Number.isFinite(parsed) ? parsed : null)
+										}}
+									>
+										<SelectTrigger id="matching-requirement" className="w-full md:max-w-[75ch] pr-4">
+											<SelectValue placeholder="Select requirement" />
+										</SelectTrigger>
+										<SelectContent>
+											{requirementsQuery.data?.map((requirement) => (
+												<SelectItem key={requirement.id} value={String(requirement.id)}>
+													#{requirement.id} - {requirement.title}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="flex items-center gap-1 flex-shrink-0">
+									<label className="text-sm text-muted-foreground">Include all candidates</label>
+									<Switch
+										aria-label="Include all candidates"
+										size="sm"
+										checked={matchAll}
+										onCheckedChange={(val) => setMatchAll(Boolean(val))}
+									/>
+								</div>
+							</div>
+						</div>
 					</Field>
-
-					<div className="flex flex-wrap items-center gap-3">
-						<Button
-							type="button"
-							disabled={
-								effectiveRequirementId === null || runMatchingMutation.isPending
-							}
-							onClick={() => {
-								if (effectiveRequirementId !== null) {
-									runMatchingMutation.mutate(effectiveRequirementId)
-								}
-							}}
-						>
-							{runMatchingMutation.isPending && (
-								<Loader2Icon className="animate-spin" />
-							)}
-							Run Matching
-						</Button>
-						<Button
-							type="button"
-							variant="outline"
-							disabled={effectiveRequirementId === null}
-							onClick={() => {
-								void matchResultsQuery.refetch()
-							}}
-						>
-							Refresh Results
-						</Button>
-						{selectedRequirement && (
-							<Badge variant="secondary">{selectedRequirement.title}</Badge>
-						)}
-					</div>
 
 					{selectedRequirement?.skills?.length ? (
 						<div className="flex flex-wrap gap-2">
@@ -320,6 +314,41 @@ export function MatchingSection() {
 							))}
 						</div>
 					) : null}
+
+					{/* Buttons and badge placed below skills, right-aligned */}
+					<div className="mt-4 flex justify-start">
+						<div className="flex items-center gap-2 flex-wrap">
+							<Button
+								type="button"
+								disabled={
+									effectiveRequirementId === null || runMatchingMutation.isPending
+								}
+								onClick={() => {
+									if (effectiveRequirementId !== null) {
+										runMatchingMutation.mutate({ requirementId: effectiveRequirementId, matchAll })
+									}
+								}}
+							>
+								{runMatchingMutation.isPending && (
+									<Loader2Icon className="animate-spin" />
+									)}
+								Run Matching
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									disabled={effectiveRequirementId === null}
+									onClick={() => {
+										void matchResultsQuery.refetch()
+									}}
+								>
+									Refresh Results
+								</Button>
+								{selectedRequirement && (
+									<Badge className="ml-2" variant="secondary">{selectedRequirement.title}</Badge>
+								)}
+						</div>
+					</div>
 				</CardContent>
 			</Card>
 
@@ -460,15 +489,14 @@ export function MatchingSection() {
 						<Table>
 							<TableHeader>
 								<TableRow>
-									<TableHead>Candidate</TableHead>
-									<TableHead>Experience</TableHead>
-									<TableHead>Location</TableHead>
-									<TableHead>Score</TableHead>
-									<TableHead>Requirement</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead>Reason</TableHead>
-									<TableHead className="text-right">Actions</TableHead>
-								</TableRow>
+										<TableHead>Candidate</TableHead>
+										<TableHead>Experience</TableHead>
+										<TableHead>Location</TableHead>
+										<TableHead>Score</TableHead>
+										{showStatusColumn && <TableHead>Status</TableHead>}
+										<TableHead>Reason</TableHead>
+										<TableHead className="text-right">Actions</TableHead>
+									</TableRow>
 							</TableHeader>
 							<TableBody>
 								{rankedCandidates.map((result: MatchResultRead) => (
@@ -479,19 +507,23 @@ export function MatchingSection() {
 										<TableCell>{result.candidate.experience_years ?? "-"}</TableCell>
 										<TableCell>{result.candidate.location ?? "-"}</TableCell>
 										<TableCell>
-											<Badge>{toScorePercent(result.score)}%</Badge>
-										</TableCell>
-										<TableCell>{result.requirement.title}</TableCell>
-										<TableCell>
 											{(() => {
-												const status = localStatuses[result.candidate.id] ?? result.status
-												return (
-													<Badge variant={statusBadgeVariant(status)}>
-														{status}
-													</Badge>
-												)
+												const pct = toScorePercent(result.score)
+												return <span className={scoreColorClass(pct)}>{pct}%</span>
 											})()}
 										</TableCell>
+										{showStatusColumn ? (
+											<TableCell>
+												{(() => {
+													const status = localStatuses[result.candidate.id] ?? result.status
+													return (
+														<Badge variant={statusBadgeVariant(status)}>
+															{status}
+														</Badge>
+													)
+												})()}
+											</TableCell>
+										) : null}
 										<TableCell className="max-w-130 whitespace-normal">
 											{result.reason}
 										</TableCell>
@@ -556,11 +588,13 @@ export function MatchingSection() {
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
-						<div className="flex flex-wrap items-center gap-3">
+						<div className="flex flex-wrap items-center gap-3 items-baseline">
 							<Badge variant={statusBadgeVariant(activeMatch.status)}>
 								Status: {activeMatch.status}
 							</Badge>
-							<Badge>Score: {toScorePercent(activeMatch.score)}%</Badge>
+							<div className="text-sm">
+								Score: <span className={scoreColorClass(toScorePercent(activeMatch.score))}>{toScorePercent(activeMatch.score)}%</span>
+							</div>
 						</div>
 						<p className="text-sm text-muted-foreground">
 							{activeMatch.reason}
