@@ -1,11 +1,10 @@
 import type { Metadata } from "next"
-import { CandidatesSection } from "@/components/dashboard/sections/candidates-section"
 
 export const metadata: Metadata = {
   title: "Candidates — Resume Matcher AI",
   description: "View and manage candidates, comments, and profiles.",
 }
 
-export default function DashboardCandidatesPage() {
-  return <CandidatesSection />
+export default function CandidatesLayout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
 }

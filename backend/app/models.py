@@ -8,6 +8,7 @@ from sqlalchemy import (
     Column,
     Date,
     ForeignKey,
+    Boolean,
     Integer,
     String,
     Text,
@@ -260,3 +261,33 @@ class CandidateStatus(Base):
     )
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+
+class User(Base):
+    __tablename__ = "app_user"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    username = Column(String(255), nullable=False, unique=True)
+    email = Column(String(255), nullable=False, unique=True)
+    hashed_password = Column(String(255), nullable=False)
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    refresh_tokens = relationship(
+        "RefreshToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_token"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("app_user.id", ondelete="CASCADE"), nullable=False)
+    token_hash = Column(String(128), nullable=False, index=True)
+    expires_at = Column(TIMESTAMP, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    user = relationship("User", back_populates="refresh_tokens")

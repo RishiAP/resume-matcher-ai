@@ -83,6 +83,31 @@ class Settings(BaseSettings):
         alias="REQUEST_LIMIT_PER_DAY",
     )
 
+    # Authentication / tokens
+    secret_key: str = Field(default="please-set-a-secret-key", alias="SECRET_KEY")
+    access_token_expire_minutes: int = Field(
+        default=15,
+        ge=1,
+        alias="ACCESS_TOKEN_EXPIRE_MINUTES",
+    )
+    refresh_token_expire_days: int = Field(
+        default=30,
+        ge=1,
+        alias="REFRESH_TOKEN_EXPIRE_DAYS",
+    )
+    refresh_token_cookie_name: str = Field(
+        default="refresh_token",
+        alias="REFRESH_TOKEN_COOKIE_NAME",
+    )
+    refresh_token_cookie_secure: bool = Field(
+        default=False,
+        alias="REFRESH_TOKEN_COOKIE_SECURE",
+    )
+    refresh_token_cookie_samesite: str = Field(
+        default="lax",
+        alias="REFRESH_TOKEN_COOKIE_SAMESITE",
+    )
+
     # AI provider toggle
     ai_mode: str = Field(default="local", alias="AI_MODE")
 

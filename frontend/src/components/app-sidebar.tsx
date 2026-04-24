@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import {
   ActivityIcon,
   BriefcaseBusinessIcon,
@@ -19,7 +20,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarFooter,
 } from "@/components/ui/sidebar"
+import { NavUser } from "@/components/nav-user"
 
 export type DashboardSection =
   | "overview"
@@ -111,17 +114,32 @@ export function AppSidebar({
   return (
     <Sidebar variant="inset" collapsible="icon" {...props}>
       <SidebarHeader className="gap-2 group-data-[collapsible=icon]:items-center">
-        <div className="overflow-hidden rounded-lg border border-sidebar-border/60 bg-sidebar-accent/40 px-3 py-2 transition-all duration-200 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-2">
-          <p className="text-xs tracking-wide text-sidebar-foreground/70 uppercase group-data-[collapsible=icon]:hidden">
-            Resume Matcher AI
-          </p>
-          <p className="mt-1 text-sm font-semibold group-data-[collapsible=icon]:hidden">
-            Recruitment Console
-          </p>
-          <p className="hidden text-center text-xs font-semibold tracking-wide text-sidebar-foreground group-data-[collapsible=icon]:block">
-            RM
-          </p>
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              size="lg"
+              className="h-12 gap-3 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/40 px-3 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:rounded-none group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent"
+            >
+              <Link href="/dashboard">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-background/50 ring-1 ring-border/60 group-data-[collapsible=icon]:rounded-none group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:ring-0">
+                  <Image
+                    src="/favicon-32x32.png"
+                    alt="Resume Matcher AI"
+                    width={32}
+                    height={32}
+                    className="h-8 w-8"
+                    priority
+                  />
+                </div>
+                <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
+                  <span className="text-sm font-semibold">Resume Matcher AI</span>
+                  <span className="text-xs text-muted-foreground">Recruitment Console</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent>
@@ -145,6 +163,11 @@ export function AppSidebar({
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter className="mt-auto">
+        <NavUser />
+      </SidebarFooter>
+
       <SidebarRail />
     </Sidebar>
   )

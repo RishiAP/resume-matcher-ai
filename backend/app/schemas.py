@@ -112,6 +112,29 @@ class ErrorResponse(BaseModel):
     detail: str
 
 
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+
+
+class UserRead(BaseModel):
+    id: int
+    username: str | None = None
+    email: str
+    is_active: bool | None = True
+
+
+class LoginRequest(BaseModel):
+    identifier: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok"]
     ai_mode: str

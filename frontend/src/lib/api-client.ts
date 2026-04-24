@@ -2,13 +2,136 @@ import axios from "axios"
 
 import type { components, operations } from "@/generated/api-types"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:8000"
+// By default use same-origin (empty baseURL) and call `/api/...` routes.
+// Set `NEXT_PUBLIC_API_BASE_URL` to override (e.g. http://localhost:8000).
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || ""
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30_000,
 })
+
+// Send cookies (httpOnly refresh token) by default so refresh endpoint works
+apiClient.defaults.withCredentials = true
+
+// In-memory access token (keep in JS memory to reduce XSS risk)
+let accessToken: string | null = null
+let refreshInFlight: Promise<TokenResponse> | null = null
+
+export function setAccessToken(token: string | null) {
+  accessToken = token
+}
+
+export function getAccessToken() {
+  return accessToken
+}
+
+export function decodeJwt(token: string | null) {
+  if (!token) return null
+  try {
+    const parts = token.split(".")
+    if (parts.length < 2) return null
+    const payload = parts[1]
+    // base64url -> base64
+    let base64 = payload.replace(/-/g, "+").replace(/_/g, "/")
+    while (base64.length % 4) base64 += "="
+
+    let jsonStr: string
+    if (typeof window !== "undefined" && typeof window.atob === "function") {
+      jsonStr = decodeURIComponent(
+        window
+          .atob(base64)
+          .split("")
+          .map((c) => `%${("00" + c.charCodeAt(0).toString(16)).slice(-2)}`)
+          .join("")
+      )
+    } else {
+      // Node environment fallback
+      const buf = Buffer.from(base64, "base64")
+      jsonStr = buf.toString("utf8")
+    }
+
+    return JSON.parse(jsonStr)
+  } catch {
+    return null
+  }
+}
+
+// Attach access token to outgoing requests when available
+apiClient.interceptors.request.use((config) => {
+  if (accessToken) {
+    config.headers = config.headers || {}
+    config.headers["Authorization"] = `Bearer ${accessToken}`
+  }
+  return config
+})
+
+export type TokenResponse = { access_token: string; token_type: "bearer" }
+export type ApiUser = { id: number; username?: string; email: string; is_active?: boolean }
+
+export async function login(identifier: string, password: string): Promise<TokenResponse> {
+  const response = await apiClient.post<TokenResponse>("/api/auth/login", { identifier, password })
+  setAccessToken(response.data.access_token)
+  return response.data
+}
+
+export async function refreshAccessToken(): Promise<TokenResponse> {
+  if (!refreshInFlight) {
+    refreshInFlight = apiClient
+      .post<TokenResponse>("/api/auth/refresh")
+      .then((response) => {
+        setAccessToken(response.data.access_token)
+        return response.data
+      })
+      .finally(() => {
+        refreshInFlight = null
+      })
+  }
+  return refreshInFlight
+}
+
+export async function logout(): Promise<void> {
+  await apiClient.post("/api/auth/logout")
+  setAccessToken(null)
+}
+
+export async function getCurrentUser(): Promise<ApiUser> {
+  const response = await apiClient.get<ApiUser>("/api/auth/me")
+  return response.data
+}
+
+function isAuthPath(url?: string) {
+  if (!url) return false
+  return (
+    url.includes("/api/auth/login") ||
+    url.includes("/api/auth/refresh") ||
+    url.includes("/api/auth/logout")
+  )
+}
+
+// On 401, try refresh (cookie-based) once, then retry request.
+apiClient.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const status = error?.response?.status
+    const originalConfig = error?.config as (typeof error.config & { _retry?: boolean }) | undefined
+    const url = originalConfig?.url
+
+    if (status !== 401 || !originalConfig || originalConfig._retry || isAuthPath(url)) {
+      throw error
+    }
+
+    originalConfig._retry = true
+
+    try {
+      await refreshAccessToken()
+      return apiClient.request(originalConfig)
+    } catch {
+      setAccessToken(null)
+      throw error
+    }
+  }
+)
 
 type Schemas = components["schemas"]
 

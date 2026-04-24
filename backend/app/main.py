@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -16,13 +16,20 @@ app.add_middleware(
     allow_origins=settings.allowed_origins_list,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
-app.include_router(resume.router, prefix="/api/resume", tags=["Resume"])
-app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidates"])
-app.include_router(requirements.router, prefix="/api/requirements", tags=["Requirements"])
-app.include_router(matching.router, prefix="/api/matching", tags=["Matching"])
-app.include_router(rate_limit.router, prefix="/api/rate-limit", tags=["Rate Limit"])
+from app.routers import auth
+
+# Protect important API routers with authentication dependency (accepts Bearer token or refresh cookie)
+app.include_router(resume.router, prefix="/api/resume", tags=["Resume"], dependencies=[Depends(auth.get_current_user)])
+app.include_router(candidates.router, prefix="/api/candidates", tags=["Candidates"], dependencies=[Depends(auth.get_current_user)])
+app.include_router(requirements.router, prefix="/api/requirements", tags=["Requirements"], dependencies=[Depends(auth.get_current_user)])
+app.include_router(matching.router, prefix="/api/matching", tags=["Matching"], dependencies=[Depends(auth.get_current_user)])
+app.include_router(rate_limit.router, prefix="/api/rate-limit", tags=["Rate Limit"], dependencies=[Depends(auth.get_current_user)])
+
+# Public auth routes
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 
 
 @app.exception_handler(LookupError)
