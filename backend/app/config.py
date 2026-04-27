@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     )
 
     # Authentication / tokens
-    secret_key: str = Field(default="please-set-a-secret-key", alias="SECRET_KEY")
+    secret_key: str = Field(default="please-set-a-secret-key", alias="JWT_SECRET_KEY")
     access_token_expire_minutes: int = Field(
         default=15,
         ge=1,
