@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import axios from "axios"
-import { login } from "@/lib/api-client"
+import { useAuth } from "@/components/providers/auth-provider"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -14,6 +14,7 @@ import { toast } from "sonner"
 
 export default function SigninPage() {
   const router = useRouter()
+  const auth = useAuth()
   const [loading, setLoading] = useState(false)
 
   const schema = z.object({
@@ -32,7 +33,7 @@ export default function SigninPage() {
   async function onSubmit(data: FormValues) {
     setLoading(true)
     try {
-      await login(data.identifier, data.password)
+      await auth.login(data.identifier, data.password)
       toast.success("Signed in")
       const rawFrom = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") || "/dashboard" : "/dashboard"
       let target = "/dashboard"

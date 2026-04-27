@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -14,41 +14,22 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar"
 import { LogOutIcon } from "lucide-react"
-import { getCurrentUser, logout as apiLogout, setAccessToken, type ApiUser } from "@/lib/api-client"
+import { useAuth } from "@/components/providers/auth-provider"
+import type { ApiUser } from "@/lib/api-client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
 export function NavUser() {
   const { isMobile } = useSidebar()
   const router = useRouter()
-  const [user, setUser] = useState<Pick<ApiUser, "username" | "email"> | null>(null)
+  const auth = useAuth()
+  const user: Pick<ApiUser, "username" | "email"> | null = auth.user
+    ? { username: auth.user.username, email: auth.user.email }
+    : null
   const [logoutOpen, setLogoutOpen] = useState(false)
 
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const u = await getCurrentUser()
-        if (!mounted) return
-        setUser({ username: u.username, email: u.email })
-      } catch {
-        if (!mounted) return
-        setUser(null)
-      }
-    })()
-
-    return () => {
-      mounted = false
-    }
-  }, [])
-
   async function handleLogout() {
-    try {
-      await apiLogout()
-    } catch {
-      // ignore network errors
-    }
-    setAccessToken(null)
+    await auth.logout()
     router.replace("/signin")
   }
 

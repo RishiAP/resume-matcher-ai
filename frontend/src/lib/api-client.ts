@@ -18,12 +18,34 @@ apiClient.defaults.withCredentials = true
 let accessToken: string | null = null
 let refreshInFlight: Promise<TokenResponse> | null = null
 
+type TokenListener = (token: string | null) => void
+let tokenListeners: TokenListener[] = []
+let tokenProvider: (() => string | null) | null = null
+
 export function setAccessToken(token: string | null) {
   accessToken = token
+  for (const l of tokenListeners) {
+    try {
+      l(token)
+    } catch {
+      // ignore listener errors
+    }
+  }
 }
 
 export function getAccessToken() {
-  return accessToken
+  return tokenProvider ? tokenProvider() : accessToken
+}
+
+export function onAccessTokenChange(listener: TokenListener) {
+  tokenListeners.push(listener)
+  return () => {
+    tokenListeners = tokenListeners.filter((l) => l !== listener)
+  }
+}
+
+export function setTokenProvider(fn: (() => string | null) | null) {
+  tokenProvider = fn
 }
 
 export function decodeJwt(token: string | null) {
@@ -59,9 +81,10 @@ export function decodeJwt(token: string | null) {
 
 // Attach access token to outgoing requests when available
 apiClient.interceptors.request.use((config) => {
-  if (accessToken) {
+  const token = getAccessToken()
+  if (token) {
     config.headers = config.headers || {}
-    config.headers["Authorization"] = `Bearer ${accessToken}`
+    config.headers["Authorization"] = `Bearer ${token}`
   }
   return config
 })
