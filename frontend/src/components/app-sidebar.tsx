@@ -119,10 +119,11 @@ export function AppSidebar({
             <SidebarMenuButton
               asChild
               size="lg"
-              className="h-12 gap-3 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/40 px-3 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:rounded-none group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent"
+              className="h-12 gap-3 rounded-lg px-3 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:rounded-none bg-transparent border-0 hover:bg-transparent focus:bg-transparent"
             >
-              <Link href="/dashboard">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-background/50 ring-1 ring-border/60 group-data-[collapsible=icon]:rounded-none group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:ring-0">
+              <Link href="/dashboard" aria-label="Resume Matcher AI">
+                {/* small favicon: visible only when sidebar is collapsed */}
+                <div className="hidden group-data-[collapsible=icon]:flex h-8 w-8 items-center justify-center">
                   <Image
                     src="/favicon-32x32.png"
                     alt="Resume Matcher AI"
@@ -132,9 +133,17 @@ export function AppSidebar({
                     priority
                   />
                 </div>
-                <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
-                  <span className="text-sm font-semibold">Resume Matcher AI</span>
-                  <span className="text-xs text-muted-foreground">Recruitment Console</span>
+
+                {/* large raw logo: visible only when sidebar is expanded (no border or hover box) */}
+                <div className="relative h-10 w-40 group-data-[collapsible=icon]:hidden">
+                  <Image
+                    src="/NextICron-logo-white.png"
+                    alt="Resume Matcher AI"
+                    fill
+                    sizes="(max-width: 640px) 140px, 160px"
+                    style={{ objectFit: "contain" }}
+                    priority
+                  />
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -144,7 +153,7 @@ export function AppSidebar({
 
       <SidebarContent>
         <SidebarGroup className="pt-1">
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupLabel>Recruitment Console</SidebarGroupLabel>
           <SidebarMenu className="gap-1.5 pt-1">
             {dashboardSections.map((item) => (
               <SidebarMenuItem key={item.id}>

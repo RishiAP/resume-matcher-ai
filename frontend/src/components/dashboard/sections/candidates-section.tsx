@@ -904,6 +904,8 @@ export function CandidatesSection() {
 				...filters,
 				requirement_id: activeRequirementId ?? undefined,
 			}),
+		// Always refetch when this component mounts (e.g. user navigates to page)
+		refetchOnMount: "always",
 	})
 
 	const updateCandidateMutation = useMutation({
@@ -924,7 +926,9 @@ export function CandidatesSection() {
 			setViewCandidate((current) =>
 				current?.id === updated.id ? updated : current
 			)
+			// Invalidate and refetch candidate lists so UI reflects updates immediately
 			void queryClient.invalidateQueries({ queryKey: ["candidates"] })
+			void queryClient.refetchQueries({ queryKey: ["candidates"], exact: false })
 		},
 		onError: (error) => {
 			setNotification({
@@ -972,7 +976,9 @@ export function CandidatesSection() {
 				}
 			})
 
+			// Invalidate and refetch candidate lists so UI reflects new comments
 			void queryClient.invalidateQueries({ queryKey: ["candidates"] })
+			void queryClient.refetchQueries({ queryKey: ["candidates"], exact: false })
 		},
 		onError: (error) => {
 			setNotification({
@@ -1030,7 +1036,9 @@ export function CandidatesSection() {
 				}
 			})
 
+			// Invalidate and refetch candidate lists so edited comments are visible
 			void queryClient.invalidateQueries({ queryKey: ["candidates"] })
+			void queryClient.refetchQueries({ queryKey: ["candidates"], exact: false })
 		},
 		onError: (error) => {
 			setNotification({

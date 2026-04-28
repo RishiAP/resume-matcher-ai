@@ -7,6 +7,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
+import Image from "next/image"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Field, FieldLabel, FieldContent, FieldError } from "@/components/ui/field"
@@ -70,6 +71,18 @@ export default function SigninPage() {
   return (
     <main className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        <div className="flex justify-center mb-4">
+          <div className="relative h-20 w-full max-w-50 mx-auto">
+            <Image
+              src="/NextICron-logo.png"
+              alt="NextICron Logo"
+              fill
+              style={{ objectFit: "contain" }}
+              sizes="(max-width: 640px) 200px, 200px"
+              priority
+            />
+          </div>
+        </div>
         <h1 className="text-2xl font-semibold mb-4">Sign in</h1>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Field>

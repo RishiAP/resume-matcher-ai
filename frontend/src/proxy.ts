@@ -22,6 +22,8 @@ export async function proxy(request: NextRequest) {
     "/apple-touch-icon.png",
     "/android-chrome-192x192.png",
     "/android-chrome-512x512.png",
+    "/NextICron-logo.png",
+    "/NextICron-logo-white.png",
     "/robots.txt",
     "/sitemap.xml",
     "/_not-found",

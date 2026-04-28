@@ -128,6 +128,8 @@ export function ResumeIngestionSection() {
 	const requirementsQuery = useQuery<RequirementRead[]>({
 		queryKey: requirementsQueryKey,
 		queryFn: listRequirements,
+		// Refetch requirements when visiting ingestion to ensure up-to-date selection
+		refetchOnMount: "always",
 	})
 
 	const activeRequirementId =
@@ -182,8 +184,13 @@ export function ResumeIngestionSection() {
 			})
 		}
 
+		// Invalidate and immediately refetch relevant queries so UI reflects uploads
 		void queryClient.invalidateQueries({ queryKey: jobsQueryKey })
+		// refetch both active and inactive queries that start with the jobs key
+		void queryClient.refetchQueries({ queryKey: jobsQueryKey, exact: false })
 		void queryClient.invalidateQueries({ queryKey: ["candidates"] })
+		// ensure candidate lists matching various filter keys are refetched as well
+		void queryClient.refetchQueries({ queryKey: ["candidates"], exact: false })
 	}
 
 	const uploadSingleFileMutation = useMutation({

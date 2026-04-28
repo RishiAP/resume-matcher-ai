@@ -82,6 +82,8 @@ export function MatchingSection() {
 	const requirementsQuery = useQuery({
 		queryKey: requirementsQueryKey,
 		queryFn: listRequirements,
+		// Ensure requirements list is refetched when this view mounts
+		refetchOnMount: "always",
 	})
 
 	const effectiveRequirementId = useMemo(() => {
@@ -104,6 +106,8 @@ export function MatchingSection() {
 		queryKey: ["matching", effectiveRequirementId],
 		queryFn: () => getMatchingResults(effectiveRequirementId as number),
 		enabled: effectiveRequirementId !== null,
+		// Always refetch matching results when the view mounts or requirement changes
+		refetchOnMount: "always",
 	})
 
 	const updateStatusMutation = useMutation({

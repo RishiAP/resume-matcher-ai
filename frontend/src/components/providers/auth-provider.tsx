@@ -1,7 +1,7 @@
 "use client"
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 
 import type { ApiUser } from "@/lib/api-client"
 import {
@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [user, setUser] = useState<ApiUser | null>(null)
   const [isAuthReady, setIsAuthReady] = useState(false)
-  const router = useRouter()
+  // const router = useRouter()
   const pathname = usePathname()
 
   // Let api-client consult our token via provider first
@@ -83,7 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Schedule refresh before token expiry
   useEffect(() => {
-    let timer: number | undefined
     if (!accessToken) return
 
     const payload = decodeJwt(accessToken) as { exp?: number } | null
@@ -93,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const refreshBefore = 30_000 // refresh 30s before expiry
     const delay = Math.max(10_000, msUntilExpiry - refreshBefore)
 
-    timer = window.setTimeout(async () => {
+    const timer: number | undefined = window.setTimeout(async () => {
       try {
         const res = await refreshAccessToken()
         setAccessToken(res.access_token)

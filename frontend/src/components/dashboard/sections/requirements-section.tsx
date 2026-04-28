@@ -192,6 +192,8 @@ export function RequirementsSection() {
 	const requirementsQuery = useQuery({
 		queryKey: requirementsQueryKey,
 		queryFn: listRequirements,
+		// Always refresh the requirements list when this component mounts
+		refetchOnMount: "always",
 	})
 
 	const form = useForm<RequirementValues>({
@@ -285,7 +287,9 @@ export function RequirementsSection() {
 				message: `Requirement #${newRequirement.id} is ready for matching.`,
 			})
 			resetRequirementForm()
+			// Invalidate and refetch requirement lists so UI reflects changes
 			void queryClient.invalidateQueries({ queryKey: requirementsQueryKey })
+			void queryClient.refetchQueries({ queryKey: requirementsQueryKey, exact: false })
 		},
 		onError: (error) => {
 			setNotification({
@@ -311,7 +315,9 @@ export function RequirementsSection() {
 				message: `Requirement #${updatedRequirement.id} has been updated.`,
 			})
 			resetRequirementForm()
+			// Invalidate and refetch requirement lists so UI reflects changes
 			void queryClient.invalidateQueries({ queryKey: requirementsQueryKey })
+			void queryClient.refetchQueries({ queryKey: requirementsQueryKey, exact: false })
 		},
 		onError: (error) => {
 			setNotification({

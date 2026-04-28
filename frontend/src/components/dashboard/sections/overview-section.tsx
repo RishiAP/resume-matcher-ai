@@ -47,6 +47,8 @@ export function OverviewSection() {
 	const requirementsQuery = useQuery({
 		queryKey: requirementsQueryKey,
 		queryFn: () => listRequirements(),
+		// Refetch when this component mounts to ensure selection is fresh
+		refetchOnMount: "always",
 	})
 
 	const effectiveRequirementId = useMemo(() => {
@@ -64,6 +66,8 @@ export function OverviewSection() {
 			if (effectiveRequirementId === null) return null
 			return getRequirementOverview(effectiveRequirementId)
 		},
+		// Ensure overview metrics are fetched when visiting the page
+		refetchOnMount: "always",
 	})
 
 	const requirements = requirementsQuery.data ?? []
