@@ -33,7 +33,7 @@ export function AppProviders({ children }: AppProvidersProps) {
       <AuthProvider>
         <TooltipProvider>
           {children}
-          <Toaster />
+          <Toaster position="top-center" richColors />
         </TooltipProvider>
       </AuthProvider>
       {/* <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" /> */}

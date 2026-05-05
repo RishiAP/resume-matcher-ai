@@ -5,7 +5,14 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import CandidateRead, CandidateUpdate, HRCommentRead, HRCommentWrite
+from app.schemas import (
+    CandidateRead,
+    CandidateUpdate,
+    InterviewRead,
+    # request models
+    InterviewCreate,
+    InterviewUpdate,
+)
 from app.services.candidate_service import CandidateService
 
 router = APIRouter()
@@ -53,31 +60,35 @@ def update_candidate(
     return CandidateRead.model_validate(updated)
 
 
-@router.post("/{candidate_id}/comments", response_model=HRCommentRead)
-def add_candidate_comment(
+@router.post("/{candidate_id}/interviews", response_model=InterviewRead)
+def create_candidate_interview(
     candidate_id: int,
-    payload: HRCommentWrite,
+    payload: InterviewCreate,
     db: Session = Depends(get_db),
-) -> HRCommentRead:
-    created = CandidateService.add_comment(
+) -> InterviewRead:
+    created = CandidateService.create_interview(
         db=db,
         candidate_id=candidate_id,
+        interview_date=payload.interview_date,
+        interview_time=payload.interview_time,
         comment=payload.comment,
     )
-    return HRCommentRead.model_validate(created)
+    return InterviewRead.model_validate(created)
 
 
-@router.patch("/{candidate_id}/comments/{comment_id}", response_model=HRCommentRead)
-def update_candidate_comment(
+@router.patch("/{candidate_id}/interviews/{interview_id}", response_model=InterviewRead)
+def update_candidate_interview(
     candidate_id: int,
-    comment_id: int,
-    payload: HRCommentWrite,
+    interview_id: int,
+    payload: InterviewUpdate,
     db: Session = Depends(get_db),
-) -> HRCommentRead:
-    updated = CandidateService.update_comment(
+) -> InterviewRead:
+    updated = CandidateService.update_interview(
         db=db,
         candidate_id=candidate_id,
-        comment_id=comment_id,
+        interview_id=interview_id,
+        interview_date=payload.interview_date,
+        interview_time=payload.interview_time,
         comment=payload.comment,
     )
-    return HRCommentRead.model_validate(updated)
+    return InterviewRead.model_validate(updated)

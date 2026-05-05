@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -7,6 +7,7 @@ from app.schemas import (
     RequirementExtractRequest,
     RequirementExtractResponse,
     RequirementRead,
+    RequirementStatusUpdate,
 )
 from app.services.requirement_service import RequirementService
 
@@ -14,8 +15,13 @@ router = APIRouter()
 
 
 @router.get("", response_model=list[RequirementRead])
-def list_requirements(db: Session = Depends(get_db)) -> list[RequirementRead]:
-    rows = RequirementService.find_all(db)
+def list_requirements(
+    include_inactive: bool = Query(
+        False, description="Include inactive (closed) requirements in results."
+    ),
+    db: Session = Depends(get_db),
+) -> list[RequirementRead]:
+    rows = RequirementService.find_all(db, include_inactive=include_inactive)
     return [RequirementRead.model_validate(row) for row in rows]
 
 
@@ -36,6 +42,20 @@ def update_requirement(
 ) -> RequirementRead:
     try:
         updated = RequirementService.update(db, requirement_id, data.model_dump())
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return RequirementRead.model_validate(updated)
+
+
+@router.patch("/{requirement_id}/status", response_model=RequirementRead)
+def update_requirement_status(
+    requirement_id: int,
+    data: RequirementStatusUpdate,
+    db: Session = Depends(get_db),
+) -> RequirementRead:
+    try:
+        updated = RequirementService.set_active(db, requirement_id, data.is_active)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

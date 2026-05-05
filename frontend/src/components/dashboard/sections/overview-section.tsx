@@ -1,8 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { RefreshCwIcon, SparklesIcon, UsersIcon } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 
 import {
 	getApiErrorMessage,
@@ -10,6 +11,7 @@ import {
 	getRequirementOverview,
 	getSystemHealth,
 	listRequirements,
+	type RequirementRead,
 } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,15 +24,16 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-	Notification,
-	MutationState,
-	healthQueryKey,
-	jobsQueryKey,
-	requirementsQueryKey,
+ 	MutationState,
+ 	healthQueryKey,
+ 	jobsQueryKey,
+ 	requirementsQueryKey,
 } from "@/components/dashboard/sections/shared"
+import { toast } from "sonner"
 
 export function OverviewSection() {
 	const [selectedRequirementId, setSelectedRequirementId] = useState<number | null>(null)
+	const [showAll, setShowAll] = useState<boolean>(false)
 
 	const healthQuery = useQuery({
 		queryKey: healthQueryKey,
@@ -44,20 +47,29 @@ export function OverviewSection() {
 		refetchInterval: 5_000,
 	})
 
-	const requirementsQuery = useQuery({
-		queryKey: requirementsQueryKey,
-		queryFn: () => listRequirements(),
+	const requirementsQuery = useQuery<RequirementRead[]>({
+		queryKey: [...requirementsQueryKey, showAll ? "all" : "active"],
+		queryFn: () => listRequirements({ includeInactive: showAll }),
 		// Refetch when this component mounts to ensure selection is fresh
 		refetchOnMount: "always",
 	})
 
+	const requirements = useMemo(() => requirementsQuery.data ?? [], [requirementsQuery.data])
+	
+	const displayRequirements = useMemo(() => {
+		const safeRequirements = requirements ?? []
+		const activeRequirements = safeRequirements.filter((r) => r.is_active)
+		const inactiveRequirements = safeRequirements.filter((r) => !r.is_active)
+		return showAll ? [...activeRequirements, ...inactiveRequirements] : activeRequirements
+	}, [requirements, showAll])
+
 	const effectiveRequirementId = useMemo(() => {
 		if (selectedRequirementId !== null) return selectedRequirementId
-		if (requirementsQuery.data && requirementsQuery.data.length > 0) {
-			return requirementsQuery.data[0].id
+		if (displayRequirements && displayRequirements.length > 0) {
+			return displayRequirements[0].id
 		}
 		return null
-	}, [requirementsQuery.data, selectedRequirementId])
+	}, [displayRequirements, selectedRequirementId])
 
 	const overviewQuery = useQuery({
 		queryKey: ["requirement-overview", effectiveRequirementId],
@@ -70,22 +82,18 @@ export function OverviewSection() {
 		refetchOnMount: "always",
 	})
 
-	const requirements = requirementsQuery.data ?? []
 	const overview = overviewQuery.data
+
+	useEffect(() => {
+		if (healthQuery.isError) {
+			toast.error("Unable to reach backend health endpoint", {
+				description: getApiErrorMessage(healthQuery.error),
+			})
+		}
+	}, [healthQuery.isError, healthQuery.error])
 
 	return (
 		<div className="space-y-6">
-			<Notification
-				state={
-					healthQuery.isError
-						? {
-								type: "error",
-								title: "Unable to reach backend health endpoint",
-								message: getApiErrorMessage(healthQuery.error),
-						  }
-						: null
-				}
-			/>
 
 			<div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
 				<Card>
@@ -198,7 +206,20 @@ export function OverviewSection() {
 									ATS-style counts per requirement
 								</CardDescription>
 							</div>
-							<UsersIcon className="size-4 text-muted-foreground" />
+							<div className="flex items-center gap-3">
+								<label className="flex items-center gap-2 text-sm text-muted-foreground">
+									<span className="text-xs">Show inactive</span>
+									<Switch
+										size="sm"
+										checked={showAll}
+										onCheckedChange={(val) => {
+											setShowAll(Boolean(val))
+											setSelectedRequirementId(null)
+										}}
+									/>
+								</label>
+								<UsersIcon className="size-4 text-muted-foreground" />
+							</div>
 						</div>
 					</CardHeader>
 					<CardContent className="space-y-3">
@@ -208,8 +229,10 @@ export function OverviewSection() {
 								pendingLabel="Loading requirements overview"
 								idleLabel=""
 							/>
-						) : requirements.length === 0 ? (
-							<p className="text-sm text-muted-foreground">No requirements yet.</p>
+						) : displayRequirements.length === 0 ? (
+							<p className="text-sm text-muted-foreground">
+								{showAll ? "No requirements yet." : "No active requirements. Toggle to show inactive ones."}
+							</p>
 						) : (
 							<>
 								<div className="space-y-1">
@@ -228,9 +251,9 @@ export function OverviewSection() {
 											setSelectedRequirementId(Number(value))
 										}}
 									>
-										{requirements.map((requirement) => (
+										{displayRequirements.map((requirement) => (
 											<option key={requirement.id} value={requirement.id}>
-												{requirement.title}
+												{requirement.title}{!requirement.is_active ? " (inactive)" : ""}
 											</option>
 										))}
 									</select>

@@ -175,15 +175,13 @@ class RequirementService:
         return skill
 
     @staticmethod
-    def find_all(db: Session) -> list[dict]:
-        rows = (
-            db.query(Requirement)
-            .options(
-                selectinload(Requirement.skill_requirements).selectinload(RequirementSkill.skill)
-            )
-            .order_by(Requirement.created_at.desc(), Requirement.id.desc())
-            .all()
+    def find_all(db: Session, include_inactive: bool = False) -> list[dict]:
+        query = db.query(Requirement).options(
+            selectinload(Requirement.skill_requirements).selectinload(RequirementSkill.skill)
         )
+        if not include_inactive:
+            query = query.filter(Requirement.is_active.is_(True))
+        rows = query.order_by(Requirement.created_at.desc(), Requirement.id.desc()).all()
         return [RequirementService._to_dict(row) for row in rows]
 
     @staticmethod
@@ -296,6 +294,24 @@ class RequirementService:
         return RequirementService._to_dict(refreshed)
 
     @staticmethod
+    def set_active(db: Session, requirement_id: int, is_active: bool) -> dict:
+        req = (
+            db.query(Requirement)
+            .options(
+                selectinload(Requirement.skill_requirements).selectinload(RequirementSkill.skill)
+            )
+            .filter(Requirement.id == requirement_id)
+            .first()
+        )
+        if req is None:
+            raise LookupError(f"Requirement {requirement_id} not found")
+
+        req.is_active = bool(is_active)
+        db.commit()
+        db.refresh(req)
+        return RequirementService._to_dict(req)
+
+    @staticmethod
     def _to_float(value: Decimal | float | int | None) -> float | None:
         if value is None:
             return None
@@ -311,6 +327,7 @@ class RequirementService:
         return {
             "id": requirement.id,
             "title": requirement.title,
+            "is_active": bool(requirement.is_active),
             "skills": [
                 {
                     "name": link.skill.name if link.skill else "",

@@ -50,8 +50,6 @@ class Candidate(Base):
     embedding = Column(Vector(EMBED_DIMENSIONS))
     structured_profile = Column(JSONB)
 
-    interview_date = Column(Date)
-    interview_time = Column(String(10))
 
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
@@ -76,23 +74,14 @@ class Candidate(Base):
         back_populates="candidate",
         cascade="all, delete-orphan",
     )
-    hr_comments = relationship(
-        "HRComment",
+    interviews = relationship(
+        "Interview",
         back_populates="candidate",
         cascade="all, delete-orphan",
     )
 
 
-class HRComment(Base):
-    __tablename__ = "hr_comment"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    candidate_id = Column(BigInteger, ForeignKey("candidate.id", ondelete="CASCADE"), nullable=False)
-    comment = Column(Text, nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
-
-    candidate = relationship("Candidate", back_populates="hr_comments")
 
 
 class Skill(Base):
@@ -182,6 +171,7 @@ class Requirement(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     title = Column(String(255), nullable=False)
+    is_active = Column(Boolean, nullable=False, server_default="true")
     min_experience = Column(Integer)
     max_experience = Column(Integer)
     location = Column(String(255))
@@ -220,6 +210,21 @@ class RequirementSkill(Base):
     skill = relationship("Skill", back_populates="requirement_links")
 
 
+class Interview(Base):
+    __tablename__ = "interview"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    candidate_id = Column(BigInteger, ForeignKey("candidate.id", ondelete="CASCADE"), nullable=False)
+    interview_date = Column(Date)
+    interview_time = Column(String(10))
+    round = Column(Integer)
+    comment = Column(Text)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    candidate = relationship("Candidate", back_populates="interviews")
+    
+    
 class MatchResult(Base):
     __tablename__ = "match_result"
     __table_args__ = (UniqueConstraint("requirement_id", "candidate_id", name="uq_req_candidate"),)

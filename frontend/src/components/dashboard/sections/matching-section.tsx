@@ -51,11 +51,10 @@ import {
 } from "@/components/ui/table"
 import {
 	MutationState,
-	Notification,
 	requirementsQueryKey,
 	toScorePercent,
-	type ToastState,
 } from "@/components/dashboard/sections/shared"
+import { toast } from "sonner"
 
 function statusBadgeVariant(status: MatchResultRead["status"]): "default" | "outline" | "secondary" | "destructive" {
 	if (status === "processing") return "secondary"
@@ -64,9 +63,14 @@ function statusBadgeVariant(status: MatchResultRead["status"]): "default" | "out
 	return "outline"
 }
 
+function statusLabel(status: MatchResultRead["status"]) {
+	if (status === "not_applied") return "Not applied"
+	return status.charAt(0).toUpperCase() + status.slice(1)
+}
+
 export function MatchingSection() {
 	const queryClient = useQueryClient()
-	const [notification, setNotification] = useState<ToastState | null>(null)
+
 	const [selectedRequirementId, setSelectedRequirementId] = useState<number | null>(
 		null
 	)
@@ -79,9 +83,9 @@ export function MatchingSection() {
 	>({})
 	const [matchAll, setMatchAll] = useState<boolean>(false)
 
-	const requirementsQuery = useQuery({
+	const requirementsQuery = useQuery<RequirementRead[]>({
 		queryKey: requirementsQueryKey,
-		queryFn: listRequirements,
+		queryFn: () => listRequirements(),
 		// Ensure requirements list is refetched when this view mounts
 		refetchOnMount: "always",
 	})
@@ -114,7 +118,7 @@ export function MatchingSection() {
 		mutationFn: async (variables: {
 			requirementId: number
 			candidateId: number
-			status: "new" | "processing" | "rejected" | "hired"
+			status: "not_applied" | "new" | "processing" | "rejected" | "hired"
 		}) =>
 			updateMatchStatus(variables.requirementId, variables.candidateId, {
 				status: variables.status,
@@ -131,17 +135,13 @@ export function MatchingSection() {
 			) {
 				setActiveMatch({ ...activeMatch, status: variables.status })
 			}
-			setNotification({
-				type: "success",
-				title: "Status updated",
-				message: "Candidate status updated for this requirement.",
+			toast.success("Status updated", {
+				description: "Candidate status updated for this requirement.",
 			})
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Unable to update status",
-				message: getApiErrorMessage(error),
+			toast.error("Unable to update status", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -150,17 +150,13 @@ export function MatchingSection() {
 		mutationFn: (requirementId: number) => rejectZeroScoreCandidates(requirementId),
 		onSuccess: async (result) => {
 			await matchResultsQuery.refetch()
-			setNotification({
-				type: "success",
-				title: "Zero-score candidates rejected",
-				message: `Updated ${result.updated_count} candidates to rejected.`,
+			toast.success("Zero-score candidates rejected", {
+				description: `Updated ${result.updated_count} candidates to rejected.`,
 			})
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Bulk reject failed",
-				message: getApiErrorMessage(error),
+			toast.error("Bulk reject failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -177,17 +173,13 @@ export function MatchingSection() {
 			}),
 		onSuccess: async (result) => {
 			await matchResultsQuery.refetch()
-			setNotification({
-				type: "success",
-				title: "Threshold status applied",
-				message: `Updated ${result.updated_count} candidates to ${result.status}.`,
+			toast.success("Threshold status applied", {
+				description: `Updated ${result.updated_count} candidates to ${result.status}.`,
 			})
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Threshold update failed",
-				message: getApiErrorMessage(error),
+			toast.error("Threshold update failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -197,17 +189,13 @@ export function MatchingSection() {
 			runCandidateMatching(variables.requirementId, variables.candidateId),
 		onSuccess: async (_, variables) => {
 			await matchResultsQuery.refetch()
-			setNotification({
-				type: "success",
-				title: "Candidate re-matched",
-				message: `Matching refreshed for candidate #${variables.candidateId}.`,
+			toast.success("Candidate re-matched", {
+				description: `Matching refreshed for candidate #${variables.candidateId}.`,
 			})
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Per-candidate matching failed",
-				message: getApiErrorMessage(error),
+			toast.error("Per-candidate matching failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -219,17 +207,13 @@ export function MatchingSection() {
 			setSelectedRequirementId(variables.requirementId)
 			setLocalStatuses({})
 			queryClient.setQueryData(["matching", variables.requirementId], results)
-			setNotification({
-				type: "success",
-				title: "Matching completed",
-				message: `Generated ${results.length} ranked results.`,
+			toast.success("Matching completed", {
+				description: `Generated ${results.length} ranked results.`,
 			})
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Matching failed",
-				message: getApiErrorMessage(error),
+			toast.error("Matching failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -252,10 +236,6 @@ export function MatchingSection() {
 
 	return (
 		<div className="space-y-6">
-			<Notification
-				state={notification}
-				onDismiss={() => setNotification(null)}
-			/>
 
 			<Card>
 				<CardHeader>
@@ -443,10 +423,8 @@ export function MatchingSection() {
 
 											const parsed = Number(thresholdValue)
 											if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
-												setNotification({
-													type: "error",
-													title: "Invalid threshold",
-													message: "Enter a score from 0 to 100.",
+												toast.error("Invalid threshold", {
+													description: "Enter a score from 0 to 100.",
 												})
 												return
 											}
@@ -522,7 +500,7 @@ export function MatchingSection() {
 													const status = localStatuses[result.candidate.id] ?? result.status
 													return (
 														<Badge variant={statusBadgeVariant(status)}>
-															{status}
+															{statusLabel(status)}
 														</Badge>
 													)
 												})()}
@@ -534,10 +512,11 @@ export function MatchingSection() {
 										<TableCell className="text-right">
 											<div className="flex items-center justify-end gap-2">
 												<Select
-													value={localStatuses[result.candidate.id] ?? result.status}
+													value={localStatuses[result.candidate.id] ?? result.status ?? "not_applied"}
 													onValueChange={(value) => {
 														if (effectiveRequirementId === null) return
 														if (
+															value !== "not_applied" &&
 															value !== "new" &&
 															value !== "processing" &&
 															value !== "rejected" &&
@@ -557,6 +536,9 @@ export function MatchingSection() {
 														<SelectValue placeholder="Set status" />
 													</SelectTrigger>
 													<SelectContent>
+														<SelectItem value="not_applied">
+															Not applied
+														</SelectItem>
 														<SelectItem value="new">New</SelectItem>
 														<SelectItem value="processing">Processing</SelectItem>
 														<SelectItem value="rejected">Rejected</SelectItem>
@@ -594,7 +576,7 @@ export function MatchingSection() {
 					<CardContent className="space-y-4">
 						<div className="flex flex-wrap items-center gap-3 items-baseline">
 							<Badge variant={statusBadgeVariant(activeMatch.status)}>
-								Status: {activeMatch.status}
+								Status: {statusLabel(activeMatch.status)}
 							</Badge>
 							<div className="text-sm">
 								Score: <span className={scoreColorClass(toScorePercent(activeMatch.score))}>{toScorePercent(activeMatch.score)}%</span>

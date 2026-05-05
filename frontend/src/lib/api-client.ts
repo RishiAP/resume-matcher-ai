@@ -178,12 +178,14 @@ export type CandidateFilters = GeneratedCandidateFilters & {
   skill_experience?: string[] | null
   role_experience?: string[] | null
   skill_match_mode?: "all" | "any"
-  comment_order?: "desc" | "asc"
 }
 
-export type HRCommentRead = {
+export type InterviewRead = {
   id: number
-  comment: string
+  round?: number | null
+  interview_date?: string | null
+  interview_time?: string | null
+  comment?: string | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -218,7 +220,7 @@ export type CandidateRead = {
   year_of_passing?: number | null
   gpa?: number | null
   resume_url?: string | null
-  hr_comments?: HRCommentRead[]
+  interviews?: InterviewRead[]
   matched_skills?: string[]
   missing_skills?: string[]
   interview_date?: string | null
@@ -250,10 +252,6 @@ export type CandidateUpdate = {
   interview_time?: string | null
 }
 
-export type HRCommentWrite = {
-  comment: string
-}
-
 export type RequirementSkillInput = {
   name: string
   min_experience_years?: number | null
@@ -280,6 +278,7 @@ export type RequirementCreate = {
 export type RequirementRead = {
   id: number
   title: string
+  is_active: boolean
   skills: RequirementSkillRead[]
   required_skills?: string[]
   min_experience?: number | null
@@ -301,14 +300,18 @@ export type RequirementExtractResponse = {
   requirement: RequirementCreate
 }
 
+export type RequirementStatusUpdate = {
+  is_active: boolean
+}
+
 export type CandidateRequirementStatusRead = {
   candidate_id: number
   requirement_id: number
-  status: "new" | "processing" | "rejected" | "hired"
+  status: "not_applied" | "new" | "processing" | "rejected" | "hired"
 }
 
 export type MatchStatusUpdateRequest = {
-  status: "new" | "processing" | "rejected" | "hired"
+  status: "not_applied" | "new" | "processing" | "rejected" | "hired"
 }
 
 export type MatchThresholdStatusRequest = {
@@ -369,10 +372,6 @@ function buildCandidateQuery(filters?: CandidateFilters): string {
 
   if (filters.skill_match_mode) {
     params.append("skill_match_mode", filters.skill_match_mode)
-  }
-
-  if (filters.comment_order) {
-    params.append("comment_order", filters.comment_order)
   }
 
   if (typeof filters.requirement_id === "number") {
@@ -482,31 +481,40 @@ export async function updateCandidate(
   return response.data
 }
 
-export async function addCandidateComment(
+export async function createCandidateInterview(
   candidateId: number,
-  payload: HRCommentWrite
-): Promise<HRCommentRead> {
-  const response = await apiClient.post<HRCommentRead>(
-    `/api/candidates/${candidateId}/comments`,
+  payload: { interview_date?: string | null; interview_time?: string | null; comment?: string | null }
+): Promise<InterviewRead> {
+  const response = await apiClient.post<InterviewRead>(
+    `/api/candidates/${candidateId}/interviews`,
     payload
   )
   return response.data
 }
 
-export async function updateCandidateComment(
+export async function updateCandidateInterview(
   candidateId: number,
-  commentId: number,
-  payload: HRCommentWrite
-): Promise<HRCommentRead> {
-  const response = await apiClient.patch<HRCommentRead>(
-    `/api/candidates/${candidateId}/comments/${commentId}`,
+  interviewId: number,
+  payload: { interview_date?: string | null; interview_time?: string | null; comment?: string | null }
+): Promise<InterviewRead> {
+  const response = await apiClient.patch<InterviewRead>(
+    `/api/candidates/${candidateId}/interviews/${interviewId}`,
     payload
   )
   return response.data
 }
 
-export async function listRequirements(): Promise<RequirementRead[]> {
-  const response = await apiClient.get<RequirementRead[]>("/api/requirements")
+export async function listRequirements(options?: {
+  includeInactive?: boolean
+}): Promise<RequirementRead[]> {
+  const params = new URLSearchParams()
+  if (options?.includeInactive) {
+    params.set("include_inactive", "true")
+  }
+  const query = params.toString()
+  const response = await apiClient.get<RequirementRead[]>(
+    `/api/requirements${query ? `?${query}` : ""}`
+  )
   return response.data
 }
 
@@ -526,6 +534,17 @@ export async function updateRequirement(
 ): Promise<RequirementRead> {
   const response = await apiClient.patch<RequirementRead>(
     `/api/requirements/${requirementId}`,
+    payload
+  )
+  return response.data
+}
+
+export async function updateRequirementStatus(
+  requirementId: number,
+  payload: RequirementStatusUpdate
+): Promise<RequirementRead> {
+  const response = await apiClient.patch<RequirementRead>(
+    `/api/requirements/${requirementId}/status`,
     payload
   )
   return response.data

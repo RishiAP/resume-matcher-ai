@@ -428,13 +428,13 @@
         }
       }
     },
-    "/api/candidates/{candidate_id}/comments": {
+    "/api/candidates/{candidate_id}/interviews": {
       "post": {
         "tags": [
           "Candidates"
         ],
-        "summary": "Add Candidate Comment",
-        "operationId": "add_candidate_comment_api_candidates__candidate_id__comments_post",
+        "summary": "Create Candidate Interview",
+        "operationId": "create_candidate_interview_api_candidates__candidate_id__interviews_post",
         "parameters": [
           {
             "name": "candidate_id",
@@ -451,7 +451,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/HRCommentWrite"
+                "$ref": "#/components/schemas/InterviewCreate"
               }
             }
           }
@@ -462,7 +462,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HRCommentRead"
+                  "$ref": "#/components/schemas/InterviewRead"
                 }
               }
             }
@@ -480,13 +480,13 @@
         }
       }
     },
-    "/api/candidates/{candidate_id}/comments/{comment_id}": {
+    "/api/candidates/{candidate_id}/interviews/{interview_id}": {
       "patch": {
         "tags": [
           "Candidates"
         ],
-        "summary": "Update Candidate Comment",
-        "operationId": "update_candidate_comment_api_candidates__candidate_id__comments__comment_id__patch",
+        "summary": "Update Candidate Interview",
+        "operationId": "update_candidate_interview_api_candidates__candidate_id__interviews__interview_id__patch",
         "parameters": [
           {
             "name": "candidate_id",
@@ -498,12 +498,12 @@
             }
           },
           {
-            "name": "comment_id",
+            "name": "interview_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Comment Id"
+              "title": "Interview Id"
             }
           }
         ],
@@ -512,7 +512,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/HRCommentWrite"
+                "$ref": "#/components/schemas/InterviewUpdate"
               }
             }
           }
@@ -523,7 +523,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HRCommentRead"
+                  "$ref": "#/components/schemas/InterviewRead"
                 }
               }
             }
@@ -548,17 +548,41 @@
         ],
         "summary": "List Requirements",
         "operationId": "list_requirements_api_requirements_get",
+        "parameters": [
+          {
+            "name": "include_inactive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include inactive (closed) requirements in results.",
+              "default": false,
+              "title": "Include Inactive"
+            },
+            "description": "Include inactive (closed) requirements in results."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/RequirementRead"
                   },
-                  "type": "array",
                   "title": "Response List Requirements Api Requirements Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -572,14 +596,14 @@
         "summary": "Create Requirement",
         "operationId": "create_requirement_api_requirements_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RequirementCreate"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -629,6 +653,58 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RequirementCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requirements/{requirement_id}/status": {
+      "patch": {
+        "tags": [
+          "Requirements"
+        ],
+        "summary": "Update Requirement Status",
+        "operationId": "update_requirement_status_api_requirements__requirement_id__status_patch",
+        "parameters": [
+          {
+            "name": "requirement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Requirement Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementStatusUpdate"
               }
             }
           }
@@ -1737,13 +1813,6 @@
             ],
             "title": "Resume Url"
           },
-          "hr_comments": {
-            "items": {
-              "$ref": "#/components/schemas/HRCommentRead"
-            },
-            "type": "array",
-            "title": "Hr Comments"
-          },
           "matched_skills": {
             "items": {
               "type": "string"
@@ -1798,6 +1867,13 @@
               }
             ],
             "title": "Interview Time"
+          },
+          "interviews": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewRead"
+            },
+            "type": "array",
+            "title": "Interviews"
           },
           "created_at": {
             "anyOf": [
@@ -1871,6 +1947,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "not_applied",
               "new",
               "processing",
               "rejected",
@@ -1962,63 +2039,6 @@
         "type": "object",
         "title": "CandidateUpdate"
       },
-      "HRCommentRead": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "comment": {
-            "type": "string",
-            "title": "Comment"
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created At"
-          },
-          "updated_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "comment"
-        ],
-        "title": "HRCommentRead"
-      },
-      "HRCommentWrite": {
-        "properties": {
-          "comment": {
-            "type": "string",
-            "maxLength": 1500,
-            "minLength": 1,
-            "title": "Comment"
-          }
-        },
-        "type": "object",
-        "required": [
-          "comment"
-        ],
-        "title": "HRCommentWrite"
-      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2081,6 +2101,168 @@
         ],
         "title": "HealthResponse"
       },
+      "InterviewCreate": {
+        "properties": {
+          "interview_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Date"
+          },
+          "interview_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Time"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "title": "InterviewCreate"
+      },
+      "InterviewRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round"
+          },
+          "interview_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Date"
+          },
+          "interview_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Time"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "InterviewRead"
+      },
+      "InterviewUpdate": {
+        "properties": {
+          "interview_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Date"
+          },
+          "interview_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interview Time"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "title": "InterviewUpdate"
+      },
       "LoginRequest": {
         "properties": {
           "identifier": {
@@ -2142,6 +2324,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "not_applied",
               "new",
               "processing",
               "rejected",
@@ -2393,6 +2576,11 @@
             "type": "string",
             "title": "Title"
           },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
           "skills": {
             "items": {
               "$ref": "#/components/schemas/RequirementSkillRead"
@@ -2573,6 +2761,19 @@
           "name"
         ],
         "title": "RequirementSkillRead"
+      },
+      "RequirementStatusUpdate": {
+        "properties": {
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_active"
+        ],
+        "title": "RequirementStatusUpdate"
       },
       "ResumeBulkUrlUploadRequest": {
         "properties": {

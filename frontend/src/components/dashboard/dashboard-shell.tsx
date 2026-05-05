@@ -79,7 +79,13 @@ export function DashboardShell({ children }: DashboardShellProps) {
           </header>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
+        <div
+          data-dashboard-scroll
+          className="min-h-0 flex-1 overflow-y-auto p-4"
+        >
+          {children}
+        </div>
+
       </SidebarInset>
     </SidebarProvider>
   )

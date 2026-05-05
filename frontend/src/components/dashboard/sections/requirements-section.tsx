@@ -9,7 +9,7 @@ import {
 	Loader2Icon,
 	Trash2Icon,
 } from "lucide-react"
-import { useState, type KeyboardEvent } from "react"
+import { useRef, useState, type KeyboardEvent } from "react"
 import { z } from "zod"
 
 import {
@@ -19,6 +19,7 @@ import {
 	listRequirements,
 	type RequirementCreate,
 	type RequirementRead,
+	updateRequirementStatus,
 	updateRequirement,
 } from "@/lib/api-client"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -50,15 +51,15 @@ import {
 	TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 import {
 	MutationState,
-	Notification,
 	SkillsPreview,
 	requirementsQueryKey,
 	toOptionalFloat,
 	toOptionalInt,
-	type ToastState,
 } from "@/components/dashboard/sections/shared"
+import { toast } from "sonner"
 
 const requirementSchema = z
 	.object({
@@ -184,14 +185,16 @@ const emptyRequirementValues: RequirementValues = {
 
 export function RequirementsSection() {
 	const queryClient = useQueryClient()
-	const [notification, setNotification] = useState<ToastState | null>(null)
+
 	const [editingRequirementId, setEditingRequirementId] = useState<number | null>(
 		null
 	)
+	const [statusUpdateId, setStatusUpdateId] = useState<number | null>(null)
+	const requirementFormRef = useRef<HTMLDivElement | null>(null)
 
 	const requirementsQuery = useQuery({
-		queryKey: requirementsQueryKey,
-		queryFn: listRequirements,
+		queryKey: [...requirementsQueryKey, "all"],
+		queryFn: () => listRequirements({ includeInactive: true }),
 		// Always refresh the requirements list when this component mounts
 		refetchOnMount: "always",
 	})
@@ -212,6 +215,70 @@ export function RequirementsSection() {
 		control: form.control,
 		name: "requiredSkills",
 	})
+
+	const getOffsetTopInContainer = (
+		element: HTMLElement,
+		container: HTMLElement
+	) => {
+		let offsetTop = 0
+		let node: HTMLElement | null = element
+
+		while (node && node !== container) {
+			offsetTop += node.offsetTop
+			node = node.offsetParent as HTMLElement | null
+		}
+
+		if (node === container) {
+			return offsetTop
+		}
+
+		const containerRect = container.getBoundingClientRect()
+		const elementRect = element.getBoundingClientRect()
+		return elementRect.top - containerRect.top + container.scrollTop
+	}
+
+	const scrollToRequirementForm = (focusTitle = true) => {
+		const formNode = requirementFormRef.current
+		if (!formNode) {
+			return
+		}
+
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				const scrollContainer =
+					(formNode.closest("[data-dashboard-scroll]") as HTMLElement | null) ??
+					formNode.ownerDocument?.querySelector<HTMLElement>(
+						"[data-dashboard-scroll]"
+					)
+
+				if (scrollContainer) {
+					const offsetTop = getOffsetTopInContainer(
+						formNode,
+						scrollContainer
+					)
+					const targetTop = Math.max(0, offsetTop - 12)
+					scrollContainer.scrollTo({
+						top: targetTop,
+						behavior: "smooth",
+					})
+					window.setTimeout(() => {
+						if (Math.abs(scrollContainer.scrollTop - targetTop) > 2) {
+							scrollContainer.scrollTop = targetTop
+						}
+					}, 120)
+				} else {
+					formNode.scrollIntoView({
+						behavior: "smooth",
+						block: "start",
+					})
+				}
+
+				if (focusTitle) {
+					form.setFocus("title")
+				}
+			})
+		})
+	}
 
 	const resetRequirementForm = () => {
 		form.reset(emptyRequirementValues)
@@ -245,6 +312,7 @@ export function RequirementsSection() {
 			qualification: requirement.qualification ?? "",
 		})
 		setEditingRequirementId(requirement.id)
+		scrollToRequirementForm()
 	}
 
 	const handleRequiredSkillEnter =
@@ -281,10 +349,8 @@ export function RequirementsSection() {
 	const createRequirementMutation = useMutation({
 		mutationFn: (payload: RequirementCreate) => createRequirement(payload),
 		onSuccess: (newRequirement) => {
-			setNotification({
-				type: "success",
-				title: "Requirement created",
-				message: `Requirement #${newRequirement.id} is ready for matching.`,
+			toast.success("Requirement created", {
+				description: `Requirement #${newRequirement.id} is ready for matching.`,
 			})
 			resetRequirementForm()
 			// Invalidate and refetch requirement lists so UI reflects changes
@@ -292,10 +358,8 @@ export function RequirementsSection() {
 			void queryClient.refetchQueries({ queryKey: requirementsQueryKey, exact: false })
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Requirement creation failed",
-				message: getApiErrorMessage(error),
+			toast.error("Requirement creation failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -309,10 +373,8 @@ export function RequirementsSection() {
 			payload: RequirementCreate
 		}) => updateRequirement(requirementId, payload),
 		onSuccess: (updatedRequirement) => {
-			setNotification({
-				type: "success",
-				title: "Requirement updated",
-				message: `Requirement #${updatedRequirement.id} has been updated.`,
+			toast.success("Requirement updated", {
+				description: `Requirement #${updatedRequirement.id} has been updated.`,
 			})
 			resetRequirementForm()
 			// Invalidate and refetch requirement lists so UI reflects changes
@@ -320,11 +382,34 @@ export function RequirementsSection() {
 			void queryClient.refetchQueries({ queryKey: requirementsQueryKey, exact: false })
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: editingRequirementId ? "Requirement update failed" : "Requirement creation failed",
-				message: getApiErrorMessage(error),
+			toast.error(editingRequirementId ? "Requirement update failed" : "Requirement creation failed", {
+				description: getApiErrorMessage(error),
 			})
+		},
+	})
+
+	const updateRequirementStatusMutation = useMutation({
+		mutationFn: (payload: { requirementId: number; isActive: boolean }) =>
+			updateRequirementStatus(payload.requirementId, {
+				is_active: payload.isActive,
+			}),
+		onMutate: (payload) => {
+			setStatusUpdateId(payload.requirementId)
+		},
+		onSuccess: (updated) => {
+			toast.success(updated.is_active ? "Requirement activated" : "Requirement closed", {
+				description: `Requirement #${updated.id} status updated.`,
+			})
+			void queryClient.invalidateQueries({ queryKey: requirementsQueryKey })
+			void queryClient.refetchQueries({ queryKey: requirementsQueryKey, exact: false })
+		},
+		onError: (error) => {
+			toast.error("Unable to update requirement status", {
+				description: getApiErrorMessage(error),
+			})
+		},
+		onSettled: () => {
+			setStatusUpdateId(null)
 		},
 	})
 
@@ -357,18 +442,14 @@ export function RequirementsSection() {
 				qualification: requirement.qualification ?? "",
 			})
 
-			setNotification({
-				type: "success",
-				title: "Requirement extracted",
-				message:
-					"The requirement form has been prefilled. Review and save it below.",
+			toast.success("Requirement extracted", {
+				description: "The requirement form has been prefilled. Review and save it below.",
 			})
+			scrollToRequirementForm()
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Extraction failed",
-				message: getApiErrorMessage(error),
+			toast.error("Extraction failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -377,6 +458,13 @@ export function RequirementsSection() {
 		createRequirementMutation.isPending || updateRequirementMutation.isPending
 
 	const sortedRequirements = [...(requirementsQuery.data ?? [])].sort((left, right) => {
+		const leftActive = left.is_active ?? true
+		const rightActive = right.is_active ?? true
+
+		if (leftActive !== rightActive) {
+			return leftActive ? -1 : 1
+		}
+
 		const leftTime = left.created_at ? new Date(left.created_at).getTime() : 0
 		const rightTime = right.created_at ? new Date(right.created_at).getTime() : 0
 
@@ -386,19 +474,23 @@ export function RequirementsSection() {
 
 		return right.id - left.id
 	})
+	const activeRequirementCount = sortedRequirements.filter(
+		(requirement) => requirement.is_active ?? true
+	).length
+	const inactiveRequirementCount =
+		sortedRequirements.length - activeRequirementCount
+	const requirementSummary = inactiveRequirementCount
+		? `${activeRequirementCount} active, ${inactiveRequirementCount} inactive`
+		: `${activeRequirementCount} active`
 
 	return (
 		<div className="space-y-6">
-			<Notification
-				state={notification}
-				onDismiss={() => setNotification(null)}
-			/>
 
 			<Card>
 				<CardHeader>
 					<CardTitle>Requirement Library</CardTitle>
 					<CardDescription>
-						{sortedRequirements.length} active requirement profiles.
+						{requirementSummary} requirement profiles.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -427,39 +519,74 @@ export function RequirementsSection() {
 									<TableHead>Location</TableHead>
 									<TableHead>Min / Max CTC</TableHead>
 									<TableHead>Qualification</TableHead>
+									<TableHead>Status</TableHead>
 									<TableHead className="text-right">Action</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{sortedRequirements.map((requirement) => (
-									<TableRow key={requirement.id}>
-										<TableCell className="font-medium">#{requirement.id}</TableCell>
-										<TableCell className="font-medium">{requirement.title}</TableCell>
-										<TableCell>
-											<SkillsPreview
-												skills={
-													requirement.skills?.map((skill) =>
-														skill.min_experience_years != null
-															? `${skill.name} (${skill.min_experience_years}+y)`
+								{sortedRequirements.map((requirement) => {
+									const isActive = requirement.is_active ?? true
+									const badgeStyles = isActive
+										? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+										: "border-rose-500/40 bg-rose-500/10 text-rose-700"
+									const dotStyles = isActive
+										? "bg-emerald-500"
+										: "bg-rose-500"
+									const label = isActive ? "Active" : "Inactive"
+									const isStatusUpdating =
+										updateRequirementStatusMutation.isPending &&
+										statusUpdateId === requirement.id
+
+									return (
+										<TableRow key={requirement.id}>
+											<TableCell className="font-medium">#{requirement.id}</TableCell>
+											<TableCell className="font-medium">{requirement.title}</TableCell>
+											<TableCell>
+												<SkillsPreview
+													skills={
+														requirement.skills?.map((skill) =>
+															skill.min_experience_years != null
+																? `${skill.name} (${skill.min_experience_years}+y)`
 															: skill.name
 													) ?? []
 												}
-												keyPrefix={`requirement-${requirement.id}`}
-											/>
-										</TableCell>
-										<TableCell>
-											{requirement.min_experience ?? "-"} - {" "}
-											{requirement.max_experience ?? "-"}
-										</TableCell>
-										<TableCell>{requirement.location ?? "-"}</TableCell>
-										<TableCell>
-											{requirement.min_ctc ?? "-"} - {requirement.max_ctc ?? "-"}
-										</TableCell>
-										<TableCell>
-											{requirement.qualification?.slice(0, 80) || "-"}
-										</TableCell>
-										<TableCell className="text-right">
-											<div className="flex justify-end gap-2">
+													keyPrefix={`requirement-${requirement.id}`}
+												/>
+											</TableCell>
+											<TableCell>
+												{requirement.min_experience ?? "-"} - {" "}
+												{requirement.max_experience ?? "-"}
+											</TableCell>
+											<TableCell>{requirement.location ?? "-"}</TableCell>
+											<TableCell>
+												{requirement.min_ctc ?? "-"} - {requirement.max_ctc ?? "-"}
+											</TableCell>
+											<TableCell>
+												{requirement.qualification?.slice(0, 80) || "-"}
+											</TableCell>
+											<TableCell>
+												<div className="flex flex-col items-center gap-2">
+													<Switch
+															size="sm"
+															checked={isActive}
+															disabled={isStatusUpdating}
+															aria-label={`${label} requirement ${requirement.id}`}
+															onCheckedChange={(checked) => {
+																updateRequirementStatusMutation.mutate({
+																	requirementId: requirement.id,
+																	isActive: checked,
+																})
+															}}
+														/>
+													<Badge variant="outline" className={badgeStyles}>
+														<span
+															className={`mr-2 inline-block size-2 rounded-full ${dotStyles}`}
+														/>
+														{label}
+													</Badge>
+												</div>
+											</TableCell>
+											<TableCell className="text-right">
 												<Button
 													type="button"
 													variant="ghost"
@@ -470,10 +597,10 @@ export function RequirementsSection() {
 												>
 													Edit
 												</Button>
-											</div>
-										</TableCell>
-									</TableRow>
-								))}
+											</TableCell>
+										</TableRow>
+									)
+								})}
 							</TableBody>
 						</Table>
 					)}
@@ -544,7 +671,8 @@ export function RequirementsSection() {
 				</CardContent>
 			</Card>
 
-			<Card>
+			<div ref={requirementFormRef}>
+				<Card>
 				<CardHeader>
 					<CardTitle>
 						{editingRequirementId
@@ -871,7 +999,8 @@ export function RequirementsSection() {
 						</div>
 					</form>
 				</CardContent>
-			</Card>
+				</Card>
+			</div>
 
 		</div>
 	)

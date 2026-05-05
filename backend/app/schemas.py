@@ -155,13 +155,48 @@ class CandidateSkillRead(BaseModel):
     experience_years: float | None = None
 
 
-class HRCommentRead(BaseModel):
+class InterviewRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    comment: str
+    round: int | None = None
+    interview_date: date | None = None
+    interview_time: str | None = None
+    comment: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class InterviewCreate(BaseModel):
+    interview_date: date | None = None
+    interview_time: str | None = None
+    comment: str | None = None
+
+    @field_validator("comment")
+    @classmethod
+    def normalize_comment(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if cleaned == "":
+            raise ValueError("Comment cannot be empty if provided")
+        return cleaned
+
+
+class InterviewUpdate(BaseModel):
+    interview_date: date | None = None
+    interview_time: str | None = None
+    comment: str | None = None
+
+    @field_validator("comment")
+    @classmethod
+    def normalize_comment(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if cleaned == "":
+            raise ValueError("Comment cannot be empty if provided")
+        return cleaned
 
 
 class HRCommentWrite(BaseModel):
@@ -223,7 +258,6 @@ class CandidateRead(BaseModel):
     year_of_passing: int | None = None
     gpa: float | None = None
     resume_url: str | None = None
-    hr_comments: list[HRCommentRead] = Field(default_factory=list)
     matched_skills: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
     # Per-requirement status when `requirement_id` is passed to the list endpoint.
@@ -232,6 +266,7 @@ class CandidateRead(BaseModel):
     requirement_status: Literal["not_applied", "new", "processing", "rejected", "hired"] | None = None
     interview_date: date | None = None
     interview_time: str | None = None
+    interviews: list[InterviewRead] = Field(default_factory=list)
     created_at: datetime | None = None
     structured_profile: dict | None = None
     skill_profiles: list[CandidateSkillRead] = Field(default_factory=list)
@@ -334,6 +369,7 @@ class RequirementRead(BaseModel):
 
     id: int
     title: str
+    is_active: bool = True
     skills: list[RequirementSkillRead] = Field(default_factory=list)
     required_skills: list[str] = Field(default_factory=list)
     min_experience: int | None = None
@@ -350,6 +386,10 @@ class RequirementRead(BaseModel):
     @classmethod
     def normalize_required_skills(cls, value: object) -> list[str]:
         return _normalize_skill_list(value)
+
+
+class RequirementStatusUpdate(BaseModel):
+    is_active: bool
 
 
 class CandidateMatchView(BaseModel):
@@ -371,11 +411,11 @@ class RequirementMatchView(BaseModel):
 class CandidateRequirementStatusRead(BaseModel):
     candidate_id: int
     requirement_id: int
-    status: Literal["new", "processing", "rejected", "hired"]
+    status: Literal["not_applied", "new", "processing", "rejected", "hired"]
 
 
 class MatchStatusUpdateRequest(BaseModel):
-    status: Literal["new", "processing", "rejected", "hired"]
+    status: Literal["not_applied", "new", "processing", "rejected", "hired"]
 
 
 class MatchThresholdStatusRequest(BaseModel):

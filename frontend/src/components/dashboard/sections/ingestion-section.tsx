@@ -37,16 +37,15 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import {
-	QueueStatusBanner,
-	Notification,
-	MutationState,
-	jobsQueryKey,
-	requirementsQueryKey,
-	hasSupportedResumeExtension,
-	isValidHttpUrl,
-	parseResumeUrls,
-	type ToastState,
+ 	QueueStatusBanner,
+ 	MutationState,
+ 	jobsQueryKey,
+ 	requirementsQueryKey,
+ 	hasSupportedResumeExtension,
+ 	isValidHttpUrl,
+ 	parseResumeUrls,
 } from "@/components/dashboard/sections/shared"
+import { toast } from "sonner"
 import {
 	Select,
 	SelectContent,
@@ -117,7 +116,7 @@ type UploadBulkUrlValues = z.infer<typeof uploadBulkUrlSchema>
 
 export function ResumeIngestionSection() {
 	const queryClient = useQueryClient()
-	const [notification, setNotification] = useState<ToastState | null>(null)
+
 	const [selectedRequirementId, setSelectedRequirementId] =
 		useState<number | null>(null)
 	const [bindToRequirement, setBindToRequirement] = useState<boolean>(true)
@@ -127,7 +126,7 @@ export function ResumeIngestionSection() {
 
 	const requirementsQuery = useQuery<RequirementRead[]>({
 		queryKey: requirementsQueryKey,
-		queryFn: listRequirements,
+		queryFn: () => listRequirements(),
 		// Refetch requirements when visiting ingestion to ensure up-to-date selection
 		refetchOnMount: "always",
 	})
@@ -171,16 +170,12 @@ export function ResumeIngestionSection() {
 		response: UploadEnqueueResponse | BulkUploadEnqueueResponse
 	) => {
 		if ("rejected" in response) {
-			setNotification({
-				type: "success",
-				title,
-				message: `Accepted ${response.accepted} resumes, rejected ${response.rejected}.`,
+			toast.success(title, {
+				description: `Accepted ${response.accepted} resumes, rejected ${response.rejected}.`,
 			})
 		} else {
-			setNotification({
-				type: "success",
-				title,
-				message: `${response.accepted} resume queued for processing.`,
+			toast.success(title, {
+				description: `${response.accepted} resume queued for processing.`,
 			})
 		}
 
@@ -214,10 +209,8 @@ export function ResumeIngestionSection() {
 			}
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Single file upload failed",
-				message: getApiErrorMessage(error),
+			toast.error("Single file upload failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -238,10 +231,8 @@ export function ResumeIngestionSection() {
 			}
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Bulk file upload failed",
-				message: getApiErrorMessage(error),
+			toast.error("Bulk file upload failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -262,10 +253,8 @@ export function ResumeIngestionSection() {
 			singleUrlForm.reset({ url: "" })
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "URL upload failed",
-				message: getApiErrorMessage(error),
+			toast.error("URL upload failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -286,10 +275,8 @@ export function ResumeIngestionSection() {
 			bulkUrlForm.reset({ urlsText: "" })
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Bulk URL upload failed",
-				message: getApiErrorMessage(error),
+			toast.error("Bulk URL upload failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -332,10 +319,6 @@ export function ResumeIngestionSection() {
 
 	return (
 		<div className="space-y-6">
-			<Notification
-				state={notification}
-				onDismiss={() => setNotification(null)}
-			/>
 			<QueueStatusBanner jobs={jobsQuery.data} />
 
 			<Card>

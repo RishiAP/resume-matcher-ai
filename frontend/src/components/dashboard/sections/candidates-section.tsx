@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useId, useState } from "react"
+import { useId, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Controller, useForm } from "react-hook-form"
@@ -9,20 +9,20 @@ import {
 	EyeIcon,
 	Loader2Icon,
 	PencilIcon,
+	PlusIcon,
 } from "lucide-react"
 import { z } from "zod"
 
 import {
-	addCandidateComment,
-	updateCandidateComment,
+	createCandidateInterview,
+	updateCandidateInterview,
 	getApiErrorMessage,
 	listCandidates,
-	updateCandidate,
+	updateMatchStatus,
 	listRequirements,
 	type CandidateFilters,
 	type CandidateRead,
-	type CandidateUpdate,
-	type HRCommentRead,
+	type InterviewRead,
 	type RequirementRead,
 } from "@/lib/api-client"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -43,8 +43,6 @@ import {
 	FieldError,
 	FieldGroup,
 	FieldLabel,
-	FieldLegend,
-	FieldSet,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
@@ -64,14 +62,14 @@ import {
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { TagInput } from "@/components/ui/tag-input"
+import { Switch } from "@/components/ui/switch"
 import {
-	MutationState,
-	Notification,
-	candidateDisplayValue,
-	toOptionalInt,
-	requirementsQueryKey,
-	type ToastState,
+ 	MutationState,
+ 	candidateDisplayValue,
+ 	toOptionalInt,
+ 	requirementsQueryKey,
 } from "@/components/dashboard/sections/shared"
+import { toast } from "sonner"
 
 const candidateFiltersSchema = z
 	.object({
@@ -110,24 +108,20 @@ const candidateFiltersSchema = z
 
 type CandidateFilterValues = z.input<typeof candidateFiltersSchema>
 
-const candidateUpdateSchema = z.object({
-	interview_date: z.union([
-		z
-			.string()
-			.regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD date format."),
-		z.literal(""),
-	]),
-	interview_time: z.union([
-		z
-			.string()
-			.regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use 24-hour HH:mm time format."),
-		z.literal(""),
-	]),
-})
-
-type CandidateUpdateValues = z.input<typeof candidateUpdateSchema>
-
 type SkillProfile = NonNullable<CandidateRead["skill_profiles"]>[number]
+
+type InterviewItem = {
+	id: number
+	comment?: string | null
+	created_at?: string | null | undefined
+	updated_at?: string | null | undefined
+	interview_date?: string | null
+	interview_time?: string | null
+	round?: number | null | undefined
+	isNew?: boolean
+}
+
+type CandidateWithInterviews = CandidateRead & { interviews?: InterviewItem[] }
 
 const skillContextPriority: Record<SkillProfile["context"], number> = {
 	primary: 0,
@@ -240,19 +234,6 @@ function rankSkillsByMonths(
 		.map((entry) => entry.name)
 }
 
-function formatCommentTimestamp(value: string | null | undefined): string {
-	if (!value) {
-		return "-"
-	}
-
-	const parsed = new Date(value)
-	if (Number.isNaN(parsed.getTime())) {
-		return value
-	}
-
-	return parsed.toLocaleString()
-}
-
 function commentTimeValue(value: string | null | undefined): number {
 	if (!value) {
 		return 0
@@ -264,10 +245,36 @@ function commentTimeValue(value: string | null | undefined): number {
 	return parsed.getTime()
 }
 
-function sortCommentsByNewest(comments: HRCommentRead[]): HRCommentRead[] {
-	return [...comments].sort(
-		(a, b) => commentTimeValue(b.created_at) - commentTimeValue(a.created_at)
-	)
+function interviewDateTimeValue(interview_date?: string | null, interview_time?: string | null, created_at?: string | null | undefined): number {
+	if (interview_date) {
+		// Combine date and time (if provided) into an ISO-ish string; fall back to midnight
+		const timePart = interview_time ? interview_time : "00:00"
+		const dt = new Date(`${interview_date}T${timePart}`)
+		if (!Number.isNaN(dt.getTime())) {
+			return dt.getTime()
+		}
+	}
+	// fallback to creation time
+	return commentTimeValue(created_at)
+}
+
+function deriveInterviews(candidate: CandidateRead | null | undefined): InterviewItem[] {
+	if (!candidate) return []
+
+	return (candidate.interviews ?? [])
+		.map((i) => ({
+			id: Number(i.id),
+			comment: i.comment ?? "",
+			created_at: i.created_at ?? null,
+			updated_at: i.updated_at ?? null,
+			interview_date: i.interview_date ?? null,
+			interview_time: i.interview_time ?? null,
+			round: typeof i.round === "number" ? i.round : null,
+		}))
+		.sort((a, b) =>
+			interviewDateTimeValue(b.interview_date, b.interview_time, b.created_at) -
+			interviewDateTimeValue(a.interview_date, a.interview_time, a.created_at)
+		)
 }
 
 function candidateQueryKey(filters?: CandidateFilters): readonly [
@@ -296,19 +303,14 @@ function CandidateViewModal({
 	candidate,
 	onClose,
 	onEdit,
+	isReadOnly,
 }: {
-	candidate: CandidateRead | null
+	candidate: CandidateWithInterviews | null
 	onClose: () => void
-	onEdit: (candidate: CandidateRead) => void
+	onEdit: (candidate: CandidateWithInterviews) => void
+	isReadOnly?: boolean
 }) {
 	const orderedSkills = buildOrderedSkills(candidate)
-
-	const interviewSchedule = [candidate?.interview_date, candidate?.interview_time]
-		.map((value) => value?.trim() ?? "")
-		.filter(Boolean)
-		.join(" • ")
-
-	const commentHistory = sortCommentsByNewest(candidate?.hr_comments ?? [])
 
 	return (
 		<CustomModal
@@ -328,7 +330,7 @@ function CandidateViewModal({
 					<Button type="button" variant="outline" onClick={onClose}>
 						Close
 					</Button>
-					{candidate ? (
+					{candidate && !isReadOnly ? (
 						<Button type="button" onClick={() => onEdit(candidate)}>
 							<PencilIcon />
 							Edit Candidate
@@ -403,38 +405,44 @@ function CandidateViewModal({
 
 						<div className="rounded-xl border border-border/70 bg-card p-4">
 							<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-								Interview Snapshot
+								Interviews
 							</p>
-							<dl className="mt-3 grid gap-3 text-sm">
-								<div>
-									<dt className="text-muted-foreground">Scheduled</dt>
-									<dd className="font-medium">
-										{candidateDisplayValue(interviewSchedule)}
-									</dd>
-								</div>
-								<div>
-									<dt className="text-muted-foreground">HR Comments</dt>
-									{commentHistory.length ? (
-										<dd className="space-y-2">
-											{commentHistory.map((comment) => (
-												<div
-													key={`candidate-comment-${candidate.id}-${comment.id}`}
-													className="rounded-md border border-border/60 bg-muted/20 p-2"
-												>
-													<p className="text-sm leading-relaxed whitespace-pre-wrap">
-														{comment.comment}
-													</p>
-													<p className="mt-1 text-xs text-muted-foreground">
-														{formatCommentTimestamp(comment.created_at)}
-													</p>
+							{(() => {
+								const interviews = deriveInterviews(candidate)
+								return interviews.length ? (
+									<div className="mt-3 space-y-2">
+										{interviews.map((iv) => (
+											<div
+												key={`candidate-interview-${candidate?.id}-${iv.id}`}
+												className="rounded-lg border border-border/60 bg-muted/20 p-3"
+											>
+												<div className="flex flex-wrap items-center gap-2">
+													{iv.round ? (
+														<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+															Round {iv.round}
+														</span>
+													) : null}
+													{iv.interview_date ? (
+														<span className="text-xs font-medium text-foreground">
+															{iv.interview_date}
+															{iv.interview_time ? ` at ${iv.interview_time}` : ""}
+														</span>
+													) : null}
 												</div>
-											))}
-										</dd>
-									) : (
-										<dd className="font-medium">-</dd>
-									)}
-								</div>
-							</dl>
+												{iv.comment ? (
+													<p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+														{iv.comment}
+													</p>
+												) : (
+													<p className="mt-1 text-xs text-muted-foreground italic">No notes</p>
+												)}
+											</div>
+										))}
+									</div>
+								) : (
+									<p className="mt-3 text-sm text-muted-foreground">No interviews scheduled yet.</p>
+								)
+							})()}
 						</div>
 					</div>
 
@@ -610,58 +618,33 @@ function CandidateViewModal({
 
 function CandidateEditModal({
 	candidate,
-	isSavingDetails,
 	isAddingComment,
 	updatingCommentId,
 	onClose,
-	onSaveDetails,
 	onAddComment,
 	onUpdateComment,
 }: {
-	candidate: CandidateRead | null
-	isSavingDetails: boolean
+	candidate: CandidateWithInterviews | null
 	isAddingComment: boolean
 	updatingCommentId: number | null
 	onClose: () => void
-	onSaveDetails: (candidateId: number, payload: CandidateUpdate) => Promise<void>
-	onAddComment: (candidateId: number, comment: string) => Promise<void>
+	onAddComment: (candidateId: number, comment: string, interview_date?: string | null, interview_time?: string | null) => Promise<InterviewRead>
 	onUpdateComment: (
 		candidateId: number,
 		commentId: number,
-		comment: string
-	) => Promise<void>
+		comment: string,
+		interview_date?: string | null,
+		interview_time?: string | null,
+	) => Promise<InterviewRead>
 }) {
-	const form = useForm<CandidateUpdateValues>({
-		resolver: zodResolver(candidateUpdateSchema),
-		defaultValues: {
-			interview_date: "",
-			interview_time: "",
-		},
-	})
 	const formId = useId()
-	const [newComment, setNewComment] = useState("")
-	const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>(() =>
-		Object.fromEntries(
-			(candidate?.hr_comments ?? []).map((row) => [row.id, row.comment])
-		)
+	const [localInterviews, setLocalInterviews] = useState<InterviewItem[]>(() => deriveInterviews(candidate))
+	const [tempIdCounter, setTempIdCounter] = useState(-1)
+
+	const sortedInterviews = [...localInterviews].sort((a, b) =>
+		interviewDateTimeValue(b.interview_date, b.interview_time, b.created_at) -
+		interviewDateTimeValue(a.interview_date, a.interview_time, a.created_at)
 	)
-
-	useEffect(() => {
-		if (!candidate) {
-			form.reset({
-				interview_date: "",
-				interview_time: "",
-			})
-			return
-		}
-
-		form.reset({
-			interview_date: candidate.interview_date ?? "",
-			interview_time: candidate.interview_time ?? "",
-		})
-	}, [candidate, form])
-
-	const sortedComments = sortCommentsByNewest(candidate?.hr_comments ?? [])
 
 	return (
 		<CustomModal
@@ -671,33 +654,16 @@ function CandidateEditModal({
 			title={
 				candidate?.name?.trim() ? `Edit ${candidate.name}` : "Update Candidate"
 			}
-			description="Update interview workflow fields and manage HR comments separately with backend-generated timestamps."
+			description="Manage interview rounds, dates, and notes. Timestamps are generated by the backend."
 			footer={
 				<>
 					<Button type="button" variant="outline" onClick={onClose}>
-						Cancel
-					</Button>
-					<Button type="submit" form={formId} disabled={isSavingDetails}>
-						{isSavingDetails && <Loader2Icon className="animate-spin" />}
-						Save Interview Details
+						Close
 					</Button>
 				</>
 			}
 		>
-			<form
-				id={formId}
-				className="space-y-6"
-				onSubmit={form.handleSubmit(async (values) => {
-					if (!candidate) {
-						return
-					}
-
-					await onSaveDetails(candidate.id, {
-						interview_date: values.interview_date || null,
-						interview_time: values.interview_time || null,
-					})
-				})}
-			>
+			<div id={formId} className="space-y-6">
 				{candidate ? (
 					<div className="rounded-xl border border-border/70 bg-muted/20 p-4">
 						<p className="text-sm font-semibold">
@@ -716,107 +682,152 @@ function CandidateEditModal({
 					</div>
 				) : null}
 
-				<FieldSet>
-					<FieldLegend>Interview Details</FieldLegend>
-					<FieldGroup className="grid gap-4 md:grid-cols-2">
-						<Controller
-							name="interview_date"
-							control={form.control}
-							render={({ field, fieldState }) => (
-								<Field data-invalid={fieldState.invalid}>
-									<FieldLabel htmlFor="candidate-interview-date">
-										Interview Date
-									</FieldLabel>
-									<Input
-										{...field}
-										id="candidate-interview-date"
-										type="date"
-										aria-invalid={fieldState.invalid}
-									/>
-									<FieldError errors={[fieldState.error]} />
-								</Field>
-							)}
-						/>
-
-						<Controller
-							name="interview_time"
-							control={form.control}
-							render={({ field, fieldState }) => (
-								<Field data-invalid={fieldState.invalid}>
-									<FieldLabel htmlFor="candidate-interview-time">
-										Interview Time
-									</FieldLabel>
-									<Input
-										{...field}
-										id="candidate-interview-time"
-										type="time"
-										aria-invalid={fieldState.invalid}
-									/>
-									<FieldError errors={[fieldState.error]} />
-								</Field>
-							)}
-						/>
-					</FieldGroup>
-				</FieldSet>
-
-				<FieldSet>
-					<FieldLegend>HR Comments</FieldLegend>
-					<FieldDescription>
-						Timestamps are generated and stored by the backend automatically.
-					</FieldDescription>
-
-					{sortedComments.length ? (
-						<div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
-							<p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-								Existing Comments (Latest First)
+				<div>
+					<div className="mb-3 flex items-center justify-between">
+						<div>
+							<p className="text-sm font-semibold">Interviews</p>
+							<p className="text-xs text-muted-foreground">
+								Add or edit interview rounds. Timestamps are stored by the backend.
 							</p>
-							{sortedComments.map((comment) => {
-								const draft = commentDrafts[comment.id] ?? comment.comment
-								const hasChanges = draft.trim() !== comment.comment.trim()
+						</div>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								const tempId = tempIdCounter
+								setTempIdCounter((v) => v - 1)
+								setLocalInterviews((cur) => [
+									{
+										id: tempId,
+										isNew: true,
+										comment: "",
+										created_at: null,
+										updated_at: null,
+										interview_date: null,
+										interview_time: null,
+										round: undefined,
+									},
+									...cur,
+								])
+							}}
+						>
+							<PlusIcon className="size-4" />
+							Add Interview
+						</Button>
+					</div>
+
+					{sortedInterviews.length ? (
+						<div className="space-y-3">
+							{sortedInterviews.map((iv) => {
+								const isNew = iv.isNew || iv.id < 0
+								const original = deriveInterviews(candidate).find((o) => o.id === iv.id)
+								const hasChanges = isNew
+									? Boolean(iv.comment?.trim() || iv.interview_date || iv.interview_time)
+									: Boolean(
+										  !original ||
+											  (original?.comment ?? "").trim() !== (iv.comment ?? "").trim() ||
+											  (original.interview_date ?? null) !== (iv.interview_date ?? null) ||
+											  (original.interview_time ?? null) !== (iv.interview_time ?? null)
+									  )
 
 								return (
 									<div
-										key={`candidate-edit-comment-${candidate?.id}-${comment.id}`}
-										className="space-y-2 rounded-md border border-border/60 bg-card/80 p-3"
+										key={`candidate-edit-interview-${candidate?.id}-${iv.id}`}
+										className="rounded-lg border border-border/60 bg-card p-4 space-y-3"
 									>
-										<Textarea
-											value={draft}
-											onChange={(event) => {
-												setCommentDrafts((current) => ({
-													...current,
-													[comment.id]: event.target.value,
-												}))
-											}}
-											className="min-h-20"
-										/>
-										<div className="flex flex-wrap items-center justify-between gap-2">
-											<div className="text-xs text-muted-foreground">
-												<p>Added {formatCommentTimestamp(comment.created_at)}</p>
-												{comment.updated_at && comment.updated_at !== comment.created_at ? (
-													<p>Updated {formatCommentTimestamp(comment.updated_at)}</p>
-												) : null}
-											</div>
+										<div className="flex items-center justify-between">
+											<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+												{isNew ? "New Interview" : iv.round ? `Round ${iv.round}` : "Interview"}
+											</p>
+											{isNew ? (
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													onClick={() => setLocalInterviews((cur) => cur.filter((x) => x.id !== iv.id))}
+												>
+													Remove
+												</Button>
+											) : null}
+										</div>
+										<div className="grid gap-3 sm:grid-cols-2">
+											<Field>
+												<FieldLabel>Date</FieldLabel>
+												<Input
+													type="date"
+													value={iv.interview_date ?? ""}
+													onChange={(e) => {
+														const v = e.target.value || null
+														setLocalInterviews((cur) => cur.map((x) => x.id === iv.id ? { ...x, interview_date: v } : x))
+													}}
+												/>
+											</Field>
+											<Field>
+												<FieldLabel>Time</FieldLabel>
+												<Input
+													type="time"
+													value={iv.interview_time ?? ""}
+													onChange={(e) => {
+														const v = e.target.value || null
+														setLocalInterviews((cur) => cur.map((x) => x.id === iv.id ? { ...x, interview_time: v } : x))
+													}}
+												/>
+											</Field>
+										</div>
+										<Field>
+											<FieldLabel>Notes</FieldLabel>
+											<Textarea
+												value={iv.comment ?? ""}
+												onChange={(e) => setLocalInterviews((cur) => cur.map((x) => x.id === iv.id ? { ...x, comment: e.target.value } : x))}
+												placeholder="Add interview notes, feedback, or observations..."
+												className="min-h-24"
+											/>
+										</Field>
+										<div className="flex justify-end">
 											<Button
 												type="button"
-												variant="outline"
 												size="sm"
 												disabled={
 													isAddingComment ||
-													updatingCommentId === comment.id ||
-													!draft.trim() ||
+													updatingCommentId === iv.id ||
 													!hasChanges
 												}
 												onClick={async () => {
-													if (!candidate) {
-														return
+													if (!candidate) return
+													if (isNew) {
+														const created = await onAddComment(candidate.id, iv.comment ?? "", iv.interview_date ?? null, iv.interview_time ?? null)
+														if (created && typeof created === "object" && created.id) {
+															setLocalInterviews((cur) => cur.map((x) => x.id === iv.id ? {
+																id: created.id,
+																comment: created.comment ?? "",
+																created_at: created.created_at ?? null,
+																updated_at: created.updated_at ?? null,
+																interview_date: created.interview_date ?? null,
+																interview_time: created.interview_time ?? null,
+																round: created.round ?? null,
+															} : x))
+														}
+													} else {
+														const updated = await onUpdateComment(candidate.id, iv.id, iv.comment ?? "", iv.interview_date ?? null, iv.interview_time ?? null)
+														if (updated && typeof updated === "object" && updated.id) {
+															setLocalInterviews((cur) => cur.map((x) => x.id === iv.id ? {
+																id: updated.id,
+																comment: updated.comment ?? "",
+																created_at: updated.created_at ?? null,
+																updated_at: updated.updated_at ?? null,
+																interview_date: updated.interview_date ?? null,
+																interview_time: updated.interview_time ?? null,
+																round: updated.round ?? null,
+															} : x))
+														}
 													}
-													await onUpdateComment(candidate.id, comment.id, draft)
 												}}
 											>
-												{updatingCommentId === comment.id ? (
+												{(isAddingComment && isNew) || updatingCommentId === iv.id ? (
 													<Loader2Icon className="animate-spin" />
 												) : null}
-												Save Edit
+												{isNew ? "Save Interview" : "Update Interview"}
 											</Button>
 										</div>
 									</div>
@@ -824,62 +835,43 @@ function CandidateEditModal({
 							})}
 						</div>
 					) : (
-						<p className="text-sm text-muted-foreground">No HR comments yet.</p>
-					)}
-
-					<Field>
-						<FieldLabel htmlFor="candidate-comments">Add HR Comment</FieldLabel>
-						<Textarea
-							id="candidate-comments"
-							value={newComment}
-							onChange={(event) => setNewComment(event.target.value)}
-							className="min-h-24"
-							placeholder="e.g. Strong communication, good system design, schedule round 2"
-						/>
-						<div className="flex justify-end">
-							<Button
-								type="button"
-								disabled={isAddingComment || !newComment.trim() || !candidate}
-								onClick={async () => {
-									if (!candidate || !newComment.trim()) {
-										return
-									}
-									await onAddComment(candidate.id, newComment)
-									setNewComment("")
-								}}
-							>
-								{isAddingComment ? <Loader2Icon className="animate-spin" /> : null}
-								Add HR Comment
-							</Button>
+						<div className="rounded-lg border border-dashed border-border p-8 text-center">
+							<p className="text-sm text-muted-foreground">No interviews yet.</p>
+							<p className="mt-1 text-xs text-muted-foreground">Click &quot;Add Interview&quot; to schedule one.</p>
 						</div>
-					</Field>
-				</FieldSet>
-			</form>
+					)}
+				</div>
+			</div>
 		</CustomModal>
 	)
 }
 
 export function CandidatesSection() {
 	const queryClient = useQueryClient()
-	const [notification, setNotification] = useState<ToastState | null>(null)
+
 	const [filters, setFilters] = useState<CandidateFilters>({})
 	const [selectedRequirementId, setSelectedRequirementId] =
 		useState<number | null>(null)
-	const [viewCandidate, setViewCandidate] = useState<CandidateRead | null>(null)
-	const [editCandidate, setEditCandidate] = useState<CandidateRead | null>(
+	const [showInactiveRequirements, setShowInactiveRequirements] = useState(false)
+	const [viewCandidate, setViewCandidate] = useState<CandidateWithInterviews | null>(null)
+	const [editCandidate, setEditCandidate] = useState<CandidateWithInterviews | null>(
 		null
 	)
 	const [updatingCommentId, setUpdatingCommentId] = useState<number | null>(null)
 
 	const requirementsQuery = useQuery<RequirementRead[]>({
-		queryKey: requirementsQueryKey,
-		queryFn: listRequirements,
+		queryKey: [...requirementsQueryKey, showInactiveRequirements],
+		queryFn: () => listRequirements({ includeInactive: showInactiveRequirements }),
 	})
 
 	const activeRequirementId =
 		selectedRequirementId === -1
 			? null
-			: selectedRequirementId ?? requirementsQuery.data?.[0]?.id ?? null
+			: selectedRequirementId ?? requirementsQuery.data?.find(r => r.is_active)?.id ?? null
+
+	// Derive whether the currently selected requirement is inactive
+	const selectedRequirement = requirementsQuery.data?.find(r => r.id === activeRequirementId) ?? null
+	const isSelectedRequirementInactive = selectedRequirement !== null && !selectedRequirement.is_active
 
 	const showStatusColumn = selectedRequirementId !== -1 && activeRequirementId !== null
 
@@ -908,33 +900,26 @@ export function CandidatesSection() {
 		refetchOnMount: "always",
 	})
 
-	const updateCandidateMutation = useMutation({
-		mutationFn: ({
-			candidateId,
-			payload,
-		}: {
+	const updateRequirementStatusMutation = useMutation({
+		mutationFn: async (variables: {
+			requirementId: number
 			candidateId: number
-			payload: CandidateUpdate
-		}) => updateCandidate(candidateId, payload),
-		onSuccess: (updated) => {
-			setNotification({
-				type: "success",
-				title: "Candidate updated",
-				message: "Interview details have been saved.",
+			status: "not_applied" | "new" | "processing" | "rejected" | "hired"
+		}) =>
+			updateMatchStatus(variables.requirementId, variables.candidateId, {
+				status: variables.status,
+			}),
+		onSuccess: async (_data, variables) => {
+			toast.success("Status updated", {
+				description: "Candidate requirement status updated.",
 			})
-			setEditCandidate(updated)
-			setViewCandidate((current) =>
-				current?.id === updated.id ? updated : current
-			)
-			// Invalidate and refetch candidate lists so UI reflects updates immediately
-			void queryClient.invalidateQueries({ queryKey: ["candidates"] })
-			void queryClient.refetchQueries({ queryKey: ["candidates"], exact: false })
+			if (activeRequirementId === variables.requirementId) {
+				await candidatesQuery.refetch()
+			}
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Interview update failed",
-				message: getApiErrorMessage(error),
+			toast.error("Unable to update status", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -943,48 +928,52 @@ export function CandidatesSection() {
 		mutationFn: ({
 			candidateId,
 			comment,
+			interview_date,
+			interview_time,
 		}: {
 			candidateId: number
 			comment: string
-		}) => addCandidateComment(candidateId, { comment }),
+			interview_date?: string | null
+			interview_time?: string | null
+		}) => createCandidateInterview(candidateId, { comment, interview_date, interview_time }),
 		onSuccess: (created, variables) => {
-			setNotification({
-				type: "success",
-				title: "HR comment added",
-				message: "Comment has been saved with backend timestamp.",
+			toast.success("Interview added", {
+				description: "Interview has been saved with backend timestamp.",
 			})
 
+			const newInterview: InterviewItem = {
+				id: created.id,
+				comment: created.comment ?? null,
+				created_at: created.created_at ?? null,
+				updated_at: created.updated_at ?? null,
+				interview_date: created.interview_date ?? null,
+				interview_time: created.interview_time ?? null,
+				round: created.round ?? null,
+			}
+
 			setEditCandidate((current) => {
-				if (!current || current.id !== variables.candidateId) {
-					return current
-				}
-				const existing = current.hr_comments ?? []
+				if (!current || current.id !== variables.candidateId) return current
 				return {
 					...current,
-					hr_comments: sortCommentsByNewest([created, ...existing]),
+					interviews: [newInterview, ...(current.interviews ?? [])],
 				}
 			})
 
 			setViewCandidate((current) => {
-				if (!current || current.id !== variables.candidateId) {
-					return current
-				}
-				const existing = current.hr_comments ?? []
+				if (!current || current.id !== variables.candidateId) return current
 				return {
 					...current,
-					hr_comments: sortCommentsByNewest([created, ...existing]),
+					interviews: [newInterview, ...(current.interviews ?? [])],
 				}
 			})
 
-			// Invalidate and refetch candidate lists so UI reflects new comments
+			// Invalidate and refetch candidate lists so UI reflects new interviews
 			void queryClient.invalidateQueries({ queryKey: ["candidates"] })
 			void queryClient.refetchQueries({ queryKey: ["candidates"], exact: false })
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Add comment failed",
-				message: getApiErrorMessage(error),
+			toast.error("Add interview failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 	})
@@ -994,57 +983,53 @@ export function CandidatesSection() {
 			candidateId,
 			commentId,
 			comment,
+			interview_date,
+			interview_time,
 		}: {
 			candidateId: number
 			commentId: number
 			comment: string
-		}) => updateCandidateComment(candidateId, commentId, { comment }),
+			interview_date?: string | null
+			interview_time?: string | null
+		}) => updateCandidateInterview(candidateId, commentId, { comment, interview_date, interview_time }),
 		onMutate: ({ commentId }) => {
 			setUpdatingCommentId(commentId)
 		},
 		onSuccess: (updated, variables) => {
-			setNotification({
-				type: "success",
-				title: "HR comment updated",
-				message: "Previous comment was edited successfully.",
+			toast.success("Interview updated", {
+				description: "Interview details were saved successfully.",
 			})
 
-			const patchComments = (comments: HRCommentRead[] | undefined) => {
-				const rows = comments ?? []
-				return sortCommentsByNewest(
-					rows.map((row) => (row.id === variables.commentId ? updated : row))
+			const patchInterviews = (interviews: InterviewItem[] | undefined) =>
+				(interviews ?? []).map((iv) =>
+					iv.id === variables.commentId
+						? {
+							...iv,
+							comment: updated.comment ?? null,
+							interview_date: updated.interview_date ?? null,
+							interview_time: updated.interview_time ?? null,
+							updated_at: updated.updated_at ?? null,
+						}
+						: iv
 				)
-			}
 
 			setEditCandidate((current) => {
-				if (!current || current.id !== variables.candidateId) {
-					return current
-				}
-				return {
-					...current,
-					hr_comments: patchComments(current.hr_comments),
-				}
+				if (!current || current.id !== variables.candidateId) return current
+				return { ...current, interviews: patchInterviews(current.interviews) }
 			})
 
 			setViewCandidate((current) => {
-				if (!current || current.id !== variables.candidateId) {
-					return current
-				}
-				return {
-					...current,
-					hr_comments: patchComments(current.hr_comments),
-				}
+				if (!current || current.id !== variables.candidateId) return current
+				return { ...current, interviews: patchInterviews(current.interviews) }
 			})
 
-			// Invalidate and refetch candidate lists so edited comments are visible
+			// Invalidate and refetch candidate lists so edited interviews are visible
 			void queryClient.invalidateQueries({ queryKey: ["candidates"] })
 			void queryClient.refetchQueries({ queryKey: ["candidates"], exact: false })
 		},
 		onError: (error) => {
-			setNotification({
-				type: "error",
-				title: "Edit comment failed",
-				message: getApiErrorMessage(error),
+			toast.error("Update interview failed", {
+				description: getApiErrorMessage(error),
 			})
 		},
 		onSettled: () => {
@@ -1070,10 +1055,6 @@ export function CandidatesSection() {
 
 	return (
 		<div className="space-y-6">
-			<Notification
-				state={notification}
-				onDismiss={() => setNotification(null)}
-			/>
 
 			<Card>
 				<CardHeader>
@@ -1082,7 +1063,7 @@ export function CandidatesSection() {
 						Candidates are shown for the selected requirement.
 					</CardDescription>
 				</CardHeader>
-				<CardContent>
+				<CardContent className="space-y-4">
 					<Field orientation="responsive">
 						<FieldLabel>Requirement</FieldLabel>
 						<Select
@@ -1115,7 +1096,7 @@ export function CandidatesSection() {
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="ALL">All candidates</SelectItem>
-								{requirementsQuery.data?.map((requirement) => (
+								{requirementsQuery.data?.filter(r => r.is_active).map((requirement) => (
 									<SelectItem
 										key={requirement.id}
 										value={requirement.id.toString()}
@@ -1123,9 +1104,53 @@ export function CandidatesSection() {
 										{requirement.title}
 									</SelectItem>
 								))}
+								{showInactiveRequirements && requirementsQuery.data?.some(r => !r.is_active) && (
+									<>
+										<div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+											Inactive
+										</div>
+										{requirementsQuery.data?.filter(r => !r.is_active).map((requirement) => (
+											<SelectItem
+												key={requirement.id}
+												value={requirement.id.toString()}
+												className="text-muted-foreground"
+											>
+												{requirement.title} (inactive)
+											</SelectItem>
+										))}
+									</>
+								)}
 							</SelectContent>
 						</Select>
 					</Field>
+
+					<div className="flex items-center gap-2">
+						<Switch
+							id="show-inactive"
+							size="sm"
+							checked={showInactiveRequirements}
+							onCheckedChange={(checked) => {
+								setShowInactiveRequirements(checked)
+								// If currently selected requirement becomes hidden, reset selection
+								if (!checked && isSelectedRequirementInactive) {
+									setSelectedRequirementId(null)
+								}
+							}}
+						/>
+						<label htmlFor="show-inactive" className="text-sm text-muted-foreground cursor-pointer select-none">
+							Show inactive requirements
+						</label>
+					</div>
+
+					{isSelectedRequirementInactive && (
+						<Alert>
+							<AlertCircleIcon className="size-4" />
+							<AlertTitle>Inactive requirement</AlertTitle>
+							<AlertDescription>
+								This requirement is inactive. Candidate statuses are read-only.
+							</AlertDescription>
+						</Alert>
+					)}
 				</CardContent>
 			</Card>
 
@@ -1387,11 +1412,56 @@ export function CandidatesSection() {
 										<TableCell>{candidate.highest_degree ?? "-"}</TableCell>
 										{showStatusColumn ? (
 											<TableCell>
-												{candidate.requirement_status == null
-													? "-"
-													: candidate.requirement_status === "not_applied"
-													? "Not applied"
-													: candidate.requirement_status.charAt(0).toUpperCase() + candidate.requirement_status.slice(1)}
+												{isSelectedRequirementInactive ? (
+													(() => {
+														const status = candidate.requirement_status ?? "not_applied"
+														const styleMap: Record<string, string> = {
+															not_applied: "bg-zinc-100/60 text-zinc-500 border-zinc-200 dark:bg-zinc-800/40 dark:text-zinc-400 dark:border-zinc-700",
+															new:         "bg-blue-100/60 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800",
+															processing:  "bg-amber-100/60 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
+															rejected:    "bg-red-100/60 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800",
+															hired:       "bg-emerald-100/60 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800",
+														}
+														return (
+															<span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${styleMap[status] ?? styleMap.not_applied}`}>
+																{status.replace("_", " ")}
+															</span>
+														)
+													})()
+												) : (
+												<Select
+													value={candidate.requirement_status ?? "not_applied"}
+													onValueChange={(value) => {
+														if (activeRequirementId === null) return
+														if (
+															value !== "not_applied" &&
+															value !== "new" &&
+															value !== "processing" &&
+															value !== "rejected" &&
+															value !== "hired"
+														) {
+															return
+														}
+														updateRequirementStatusMutation.mutate({
+															requirementId: activeRequirementId,
+															candidateId: candidate.id,
+															status: value,
+														})
+													}}
+													disabled={updateRequirementStatusMutation.isPending}
+												>
+													<SelectTrigger className="w-32">
+														<SelectValue placeholder="Set status" />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="not_applied">Not applied</SelectItem>
+														<SelectItem value="new">New</SelectItem>
+														<SelectItem value="processing">Processing</SelectItem>
+														<SelectItem value="rejected">Rejected</SelectItem>
+														<SelectItem value="hired">Hired</SelectItem>
+													</SelectContent>
+												</Select>
+												)}
 											</TableCell>
 										) : null}
 										<TableCell className="text-right">
@@ -1405,6 +1475,7 @@ export function CandidatesSection() {
 													<EyeIcon />
 													View
 												</Button>
+												{!isSelectedRequirementInactive && (
 												<Button
 													type="button"
 													variant="outline"
@@ -1414,6 +1485,7 @@ export function CandidatesSection() {
 													<PencilIcon />
 													Edit
 												</Button>
+												)}
 											</div>
 										</TableCell>
 									</TableRow>
@@ -1428,6 +1500,7 @@ export function CandidatesSection() {
 			<CandidateViewModal
 				candidate={viewCandidate}
 				onClose={() => setViewCandidate(null)}
+				isReadOnly={isSelectedRequirementInactive}
 				onEdit={(candidate) => {
 					setViewCandidate(null)
 					setEditCandidate(candidate)
@@ -1437,27 +1510,24 @@ export function CandidatesSection() {
 			<CandidateEditModal
 				key={editCandidate?.id ?? -1}
 				candidate={editCandidate}
-				isSavingDetails={updateCandidateMutation.isPending}
 				isAddingComment={addCommentMutation.isPending}
 				updatingCommentId={updatingCommentId}
 				onClose={() => setEditCandidate(null)}
-				onSaveDetails={async (candidateId, payload) => {
-					await updateCandidateMutation.mutateAsync({
-						candidateId,
-						payload,
-					})
-				}}
-				onAddComment={async (candidateId, comment) => {
-					await addCommentMutation.mutateAsync({
+				onAddComment={async (candidateId, comment, interview_date, interview_time) => {
+					return addCommentMutation.mutateAsync({
 						candidateId,
 						comment,
+						interview_date,
+						interview_time,
 					})
 				}}
-				onUpdateComment={async (candidateId, commentId, comment) => {
-					await updateCommentMutation.mutateAsync({
+				onUpdateComment={async (candidateId, commentId, comment, interview_date, interview_time) => {
+					return updateCommentMutation.mutateAsync({
 						candidateId,
 						commentId,
 						comment,
+						interview_date,
+						interview_time,
 					})
 				}}
 			/>

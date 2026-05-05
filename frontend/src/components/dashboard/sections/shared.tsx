@@ -1,15 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import {
-  AlertCircleIcon,
-  CheckCircle2Icon,
-  Loader2Icon,
-  XIcon,
-} from "lucide-react"
+import { Loader2Icon } from "lucide-react"
 
 import type { QueueJobsStatus } from "@/lib/api-client"
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import {
   Tooltip,
@@ -17,11 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-export type ToastState = {
-  type: "success" | "error"
-  title: string
-  message: string
-}
+// Legacy inline Notification component removed — use Sonner toasts instead.
 
 export const acceptedResumeExtensions = [".pdf", ".doc", ".docx"]
 
@@ -102,79 +91,7 @@ export function MutationState({
   return <span className="text-sm text-muted-foreground">{idleLabel}</span>
 }
 
-export function Notification({
-  state,
-  onDismiss,
-  autoDismissMs = 5000,
-}: {
-  state: ToastState | null
-  onDismiss?: () => void
-  autoDismissMs?: number
-}) {
-  const [dismissedKey, setDismissedKey] = useState<string | null>(null)
-  const notificationKey = state
-    ? `${state.type}:${state.title}:${state.message}`
-    : null
-  const dismissed = Boolean(notificationKey && dismissedKey === notificationKey)
-
-  const dismissNotification = useCallback(() => {
-    if (onDismiss) {
-      onDismiss()
-      return
-    }
-
-    if (notificationKey) {
-      setDismissedKey(notificationKey)
-    }
-  }, [notificationKey, onDismiss])
-
-  useEffect(() => {
-    if (!state || dismissed || autoDismissMs <= 0) {
-      return
-    }
-
-    const timer = window.setTimeout(() => {
-      dismissNotification()
-    }, autoDismissMs)
-
-    return () => {
-      window.clearTimeout(timer)
-    }
-  }, [autoDismissMs, dismissNotification, dismissed, state, notificationKey])
-
-  if (!state) {
-    return null
-  }
-
-  if (dismissed) {
-    return null
-  }
-
-  const icon =
-    state.type === "success" ? (
-      <CheckCircle2Icon className="size-4" />
-    ) : (
-      <AlertCircleIcon className="size-4" />
-    )
-
-  return (
-    <Alert variant={state.type === "error" ? "destructive" : "default"}>
-      {icon}
-      <AlertTitle>{state.title}</AlertTitle>
-      <AlertDescription>{state.message}</AlertDescription>
-      <AlertAction>
-        <button
-          type="button"
-          onClick={dismissNotification}
-          className="inline-flex size-7 items-center justify-center rounded-md border border-border/70 bg-background/70 text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
-          aria-label="Dismiss notification"
-        >
-          <XIcon className="size-4" />
-        </button>
-      </AlertAction>
-    </Alert>
-  )
-}
+// Notification removed — Sonner toasts are used across the app.
 
 export function QueueStatusBanner({ jobs }: { jobs: QueueJobsStatus | undefined }) {
   if (!jobs) {

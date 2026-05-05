@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -21,7 +21,12 @@ def run_matching(
     match_all: bool = Query(False, description="If true, run matching across all candidates (not only 'new' status)"),
     db: Session = Depends(get_db),
 ) -> list[MatchResultRead]:
-    rows = MatchingService.find_matches(db, requirement_id, match_all=match_all)
+    try:
+        rows = MatchingService.find_matches(db, requirement_id, match_all=match_all)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return [MatchResultRead.model_validate(row) for row in rows]
 
 
@@ -31,7 +36,12 @@ def run_candidate_matching(
     candidate_id: int,
     db: Session = Depends(get_db),
 ) -> list[MatchResultRead]:
-    rows = MatchingService.find_matches(db, requirement_id, candidate_id=candidate_id)
+    try:
+        rows = MatchingService.find_matches(db, requirement_id, candidate_id=candidate_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return [MatchResultRead.model_validate(row) for row in rows]
 
 
@@ -54,12 +64,17 @@ def update_candidate_status(
     payload: MatchStatusUpdateRequest,
     db: Session = Depends(get_db),
 ) -> CandidateRequirementStatusRead:
-    row = MatchingService.update_status(
-        db,
-        requirement_id=requirement_id,
-        candidate_id=candidate_id,
-        status=payload.status,
-    )
+    try:
+        row = MatchingService.update_status(
+            db,
+            requirement_id=requirement_id,
+            candidate_id=candidate_id,
+            status=payload.status,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return CandidateRequirementStatusRead.model_validate(row)
 
 
@@ -68,7 +83,12 @@ def reject_zero_scores(
     requirement_id: int,
     db: Session = Depends(get_db),
 ) -> BulkStatusUpdateResponse:
-    row = MatchingService.bulk_reject_zero_scores(db, requirement_id=requirement_id)
+    try:
+        row = MatchingService.bulk_reject_zero_scores(db, requirement_id=requirement_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return BulkStatusUpdateResponse.model_validate(row)
 
 
@@ -78,12 +98,17 @@ def apply_threshold_status(
     payload: MatchThresholdStatusRequest,
     db: Session = Depends(get_db),
 ) -> BulkStatusUpdateResponse:
-    row = MatchingService.bulk_set_status_below_threshold(
-        db,
-        requirement_id=requirement_id,
-        threshold=payload.threshold,
-        status=payload.status,
-    )
+    try:
+        row = MatchingService.bulk_set_status_below_threshold(
+            db,
+            requirement_id=requirement_id,
+            threshold=payload.threshold,
+            status=payload.status,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return BulkStatusUpdateResponse.model_validate(row)
 
 

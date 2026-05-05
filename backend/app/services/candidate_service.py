@@ -6,7 +6,7 @@ from typing import Literal
 
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Candidate, CandidateSkill, CandidateStatus, HRComment
+from app.models import Candidate, CandidateSkill, CandidateStatus, Interview
 from app.services.experience_calculator import (
     calculate_role_experience_months,
     calculate_skill_experience_months,
@@ -37,6 +37,15 @@ class CandidateService:
 
     @staticmethod
     def _candidate_skill_set(candidate: Candidate) -> set[str]:
+        # Determine most-recent interview for backward compatibility fields
+        most_recent_interview = None
+        if candidate.interviews:
+            most_recent_interview = sorted(
+                candidate.interviews,
+                key=lambda ii: (getattr(ii, "created_at", None), getattr(ii, "id", 0)),
+                reverse=True,
+            )[0]
+
         return {
             link.skill.name.strip().lower()
             for link in (candidate.skill_links or [])
@@ -142,7 +151,7 @@ class CandidateService:
             selectinload(Candidate.experiences),
             selectinload(Candidate.projects),
             selectinload(Candidate.educations),
-            selectinload(Candidate.hr_comments),
+            selectinload(Candidate.interviews),
         )
         normalized_skills = CandidateService._normalize_skill_filters(skills)
         skill_thresholds = CandidateService._parse_threshold_filters(skill_experience)
@@ -229,6 +238,8 @@ class CandidateService:
 
     @staticmethod
     def update(db: Session, candidate_id: int, updates: dict) -> dict:
+        # Backwards-compatible: accept interview_date/interview_time updates
+        # and create a new Interview row for the candidate when provided.
         allowed = {"interview_date", "interview_time"}
         safe_updates = {k: v for k, v in updates.items() if k in allowed}
 
@@ -236,8 +247,15 @@ class CandidateService:
         if not candidate:
             raise LookupError(f"Candidate {candidate_id} not found")
 
-        for key, value in safe_updates.items():
-            setattr(candidate, key, value)
+        if safe_updates:
+            # Create a new interview row for backwards-compatible interview_date/time updates
+            CandidateService.create_interview(
+                db=db,
+                candidate_id=candidate.id,
+                interview_date=safe_updates.get("interview_date"),
+                interview_time=safe_updates.get("interview_time"),
+                comment=None,
+            )
 
         db.commit()
         db.refresh(candidate)
@@ -253,11 +271,96 @@ class CandidateService:
         if not text:
             raise ValueError("Comment cannot be empty")
 
-        row = HRComment(candidate_id=int(candidate.id), comment=text)
-        db.add(row)
+        # Find most recent interview for the candidate. If the most-recent
+        # interview has no comment, attach the comment there. Otherwise create
+        # a new interview row (one comment per interview).
+        interview = None
+        if candidate.interviews:
+            interview = sorted(
+                candidate.interviews,
+                key=lambda i: (
+                    i.created_at if getattr(i, "created_at", None) is not None else 0,
+                    i.id or 0,
+                ),
+                reverse=True,
+            )[0]
+
+        if interview is None or (getattr(interview, "comment", None) is not None and str(interview.comment).strip()):
+            existing_rounds = [i.round or 0 for i in (candidate.interviews or [])]
+            next_round = (max(existing_rounds) + 1) if existing_rounds else 1
+            interview = Interview(candidate_id=candidate.id, round=next_round, comment=text)
+            db.add(interview)
+            db.commit()
+            db.refresh(interview)
+        else:
+            interview.comment = text
+            db.commit()
+            db.refresh(interview)
+
+        return CandidateService._comment_to_dict(interview)
+
+    @staticmethod
+    def create_interview(
+        db: Session,
+        candidate_id: int,
+        interview_date: date | None = None,
+        interview_time: str | None = None,
+        comment: str | None = None,
+    ) -> dict:
+        candidate = db.get(Candidate, candidate_id)
+        if not candidate:
+            raise LookupError(f"Candidate {candidate_id} not found")
+
+        existing_rounds = [i.round or 0 for i in (candidate.interviews or [])]
+        next_round = (max(existing_rounds) + 1) if existing_rounds else 1
+
+        interview = Interview(
+            candidate_id=candidate.id,
+            interview_date=interview_date,
+            interview_time=interview_time,
+            round=next_round,
+            comment=str(comment).strip() if comment is not None else None,
+        )
+        db.add(interview)
+        db.commit()
+        db.refresh(interview)
+
+        return CandidateService._interview_to_dict(interview)
+
+    @staticmethod
+    def update_interview(
+        db: Session,
+        candidate_id: int,
+        interview_id: int,
+        interview_date: date | None = None,
+        interview_time: str | None = None,
+        comment: str | None = None,
+    ) -> dict:
+        candidate = db.get(Candidate, candidate_id)
+        if not candidate:
+            raise LookupError(f"Candidate {candidate_id} not found")
+
+        row = (
+            db.query(Interview)
+            .filter(Interview.id == interview_id, Interview.candidate_id == candidate_id)
+            .first()
+        )
+        if not row:
+            raise LookupError(f"Interview {interview_id} not found for candidate {candidate_id}")
+
+        if interview_date is not None:
+            row.interview_date = interview_date
+        if interview_time is not None:
+            row.interview_time = interview_time
+        if comment is not None:
+            text = str(comment).strip()
+            if not text:
+                raise ValueError("Comment cannot be empty")
+            row.comment = text
+
         db.commit()
         db.refresh(row)
-        return CandidateService._comment_to_dict(row)
+        return CandidateService._interview_to_dict(row)
 
     @staticmethod
     def update_comment(db: Session, candidate_id: int, comment_id: int, comment: str) -> dict:
@@ -266,14 +369,12 @@ class CandidateService:
             raise LookupError(f"Candidate {candidate_id} not found")
 
         row = (
-            db.query(HRComment)
-            .filter(HRComment.id == comment_id, HRComment.candidate_id == candidate_id)
+            db.query(Interview)
+            .filter(Interview.id == comment_id, Interview.candidate_id == candidate_id)
             .first()
         )
         if not row:
-            raise LookupError(
-                f"Comment {comment_id} not found for candidate {candidate_id}"
-            )
+            raise LookupError(f"Comment {comment_id} not found for candidate {candidate_id}")
 
         text = str(comment or "").strip()
         if not text:
@@ -285,12 +386,24 @@ class CandidateService:
         return CandidateService._comment_to_dict(row)
 
     @staticmethod
-    def _comment_to_dict(comment: HRComment) -> dict:
+    def _comment_to_dict(comment: Interview) -> dict:
         return {
             "id": comment.id,
             "comment": comment.comment,
-            "created_at": comment.created_at.isoformat() if comment.created_at else None,
-            "updated_at": comment.updated_at.isoformat() if comment.updated_at else None,
+            "created_at": comment.created_at.isoformat() if getattr(comment, "created_at", None) else None,
+            "updated_at": comment.updated_at.isoformat() if getattr(comment, "updated_at", None) else None,
+        }
+
+    @staticmethod
+    def _interview_to_dict(interview: Interview) -> dict:
+        return {
+            "id": interview.id,
+            "round": interview.round,
+            "interview_date": interview.interview_date.isoformat() if getattr(interview, "interview_date", None) else None,
+            "interview_time": interview.interview_time,
+            "comment": interview.comment,
+            "created_at": interview.created_at.isoformat() if getattr(interview, "created_at", None) else None,
+            "updated_at": interview.updated_at.isoformat() if getattr(interview, "updated_at", None) else None,
         }
 
     @staticmethod
@@ -345,12 +458,6 @@ class CandidateService:
             ),
         )
 
-        sorted_hr_comments = sorted(
-            candidate.hr_comments or [],
-            key=lambda row: (row.created_at is not None, row.created_at),
-            reverse=(comment_order == "desc"),
-        )
-
         candidate_skills = [link.skill.name for link in sorted_skill_links]
         candidate_skill_set = {name.strip().lower() for name in candidate_skills if name.strip()}
         normalized_selected_skills = [
@@ -362,6 +469,15 @@ class CandidateService:
         missing_skills = [
             skill for skill in normalized_selected_skills if skill not in candidate_skill_set
         ]
+
+        # Determine the most-recent interview (for backward-compatible fields)
+        most_recent_interview = None
+        if candidate.interviews:
+            most_recent_interview = sorted(
+                candidate.interviews,
+                key=lambda ii: (getattr(ii, "created_at", None), getattr(ii, "id", 0)),
+                reverse=True,
+            )[0]
 
         return {
             "id": candidate.id,
@@ -376,19 +492,25 @@ class CandidateService:
             "year_of_passing": candidate.year_of_passing,
             "gpa": CandidateService._to_float(candidate.gpa),
             "resume_url": candidate.resume_url,
-            "hr_comments": [
-                {
-                    "id": row.id,
-                    "comment": row.comment,
-                    "created_at": row.created_at.isoformat() if row.created_at else None,
-                    "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-                }
-                for row in sorted_hr_comments
-            ],
             "matched_skills": matched_skills,
             "missing_skills": missing_skills,
-            "interview_date": CandidateService._to_date(candidate.interview_date),
-            "interview_time": candidate.interview_time,
+            # Backwards-compatible single interview fields: expose the most
+            # recently created interview's date/time if present.
+            "interview_date": most_recent_interview.interview_date.isoformat() if getattr(most_recent_interview, "interview_date", None) else None,
+            "interview_time": most_recent_interview.interview_time if getattr(most_recent_interview, "interview_time", None) else None,
+            # Full list of interviews (new): include round/date/time/comment metadata
+            "interviews": [
+                {
+                    "id": i.id,
+                    "round": i.round,
+                    "interview_date": i.interview_date.isoformat() if getattr(i, "interview_date", None) else None,
+                    "interview_time": i.interview_time,
+                    "comment": i.comment,
+                    "created_at": i.created_at.isoformat() if getattr(i, "created_at", None) else None,
+                    "updated_at": i.updated_at.isoformat() if getattr(i, "updated_at", None) else None,
+                }
+                for i in sorted((candidate.interviews or []), key=lambda ii: (getattr(ii, "created_at", None), getattr(ii, "id", 0)), reverse=True)
+            ],
             "created_at": candidate.created_at.isoformat() if candidate.created_at else None,
             "structured_profile": candidate.structured_profile,
             "skill_profiles": [serialized_skill_profile(link) for link in sorted_skill_links],

@@ -27,6 +27,11 @@ class MatchingService:
         return str(value)
 
     @staticmethod
+    def _ensure_active(requirement: Requirement) -> None:
+        if not requirement.is_active:
+            raise ValueError("Requirement is inactive; matching is disabled.")
+
+    @staticmethod
     def find_matches(
         db: Session,
         requirement_id: int,
@@ -43,6 +48,8 @@ class MatchingService:
         )
         if not requirement:
             raise LookupError(f"Requirement {requirement_id} not found")
+
+        MatchingService._ensure_active(requirement)
 
         if candidate_id is not None:
             candidate = db.get(Candidate, candidate_id)
@@ -355,28 +362,17 @@ class MatchingService:
         db: Session,
         requirement_id: int,
         candidate_id: int,
-        status: Literal["new", "processing", "rejected", "hired"],
+        status: Literal["not_applied", "new", "processing", "rejected", "hired"],
     ) -> dict:
         requirement = db.get(Requirement, requirement_id)
         if not requirement:
             raise LookupError(f"Requirement {requirement_id} not found")
 
+        MatchingService._ensure_active(requirement)
+
         candidate = db.get(Candidate, candidate_id)
         if not candidate:
             raise LookupError(f"Candidate {candidate_id} not found")
-
-        match_result = (
-            db.query(MatchResult)
-            .filter(
-                MatchResult.requirement_id == requirement_id,
-                MatchResult.candidate_id == candidate_id,
-            )
-            .first()
-        )
-        if not match_result:
-            raise ValueError(
-                "Status can only be set when a matching score exists for this candidate and requirement"
-            )
 
         existing_status = (
             db.query(CandidateStatus)
@@ -387,7 +383,10 @@ class MatchingService:
             .first()
         )
 
-        if existing_status:
+        if status == "not_applied":
+            if existing_status:
+                db.delete(existing_status)
+        elif existing_status:
             existing_status.status = status
         else:
             db.add(
@@ -410,6 +409,8 @@ class MatchingService:
         requirement = db.get(Requirement, requirement_id)
         if not requirement:
             raise LookupError(f"Requirement {requirement_id} not found")
+
+        MatchingService._ensure_active(requirement)
 
         candidate_ids = [
             row.candidate_id
@@ -441,6 +442,8 @@ class MatchingService:
         requirement = db.get(Requirement, requirement_id)
         if not requirement:
             raise LookupError(f"Requirement {requirement_id} not found")
+
+        MatchingService._ensure_active(requirement)
 
         candidate_ids = [
             row.candidate_id

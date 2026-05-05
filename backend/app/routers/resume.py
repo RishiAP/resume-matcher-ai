@@ -17,6 +17,14 @@ from app.tasks.resume_tasks import process_file_task, process_url_task
 router = APIRouter()
 
 
+def _ensure_requirement_active(db: Session, requirement_id: int) -> None:
+    requirement = db.get(Requirement, requirement_id)
+    if requirement is None:
+        raise ValueError("Requirement not found for the provided requirement_id")
+    if not requirement.is_active:
+        raise ValueError("Requirement is inactive and cannot accept new resumes")
+
+
 def _queue_counts() -> QueueJobsStatus:
     inspector = celery_app.control.inspect(timeout=1.0)
     if inspector is None:
@@ -52,8 +60,8 @@ async def upload_resume(
     if not contents:
         raise ValueError("Uploaded file is empty")
 
-    if requirement_id is not None and db.get(Requirement, requirement_id) is None:
-        raise ValueError("Requirement not found for the provided requirement_id")
+    if requirement_id is not None:
+        _ensure_requirement_active(db, requirement_id)
 
     file_path, _ = ResumeService.save_uploaded_file(contents, file.filename)
     process_file_task.delay(file_path, file.filename, file.content_type or "", requirement_id)
@@ -77,8 +85,8 @@ async def upload_resume_bulk(
     rejected = 0
     errors: list[str] = []
 
-    if requirement_id is not None and db.get(Requirement, requirement_id) is None:
-        raise ValueError("Requirement not found for the provided requirement_id")
+    if requirement_id is not None:
+        _ensure_requirement_active(db, requirement_id)
 
     for file in files:
         if not file.filename:
@@ -113,8 +121,8 @@ def upload_resume_by_url(
     data: ResumeUrlUploadRequest,
     db: Session = Depends(get_db),
 ) -> UploadEnqueueResponse:
-    if data.requirement_id is not None and db.get(Requirement, data.requirement_id) is None:
-        raise ValueError("Requirement not found for the provided requirement_id")
+    if data.requirement_id is not None:
+        _ensure_requirement_active(db, data.requirement_id)
 
     process_url_task.delay(str(data.url), data.requirement_id)
     return UploadEnqueueResponse(status="queued", accepted=1)
@@ -131,8 +139,8 @@ def upload_resume_urls_bulk(
 ) -> BulkUploadEnqueueResponse:
     accepted = 0
 
-    if data.requirement_id is not None and db.get(Requirement, data.requirement_id) is None:
-        raise ValueError("Requirement not found for the provided requirement_id")
+    if data.requirement_id is not None:
+        _ensure_requirement_active(db, data.requirement_id)
 
     for url in data.urls:
         process_url_task.delay(str(url), data.requirement_id)
