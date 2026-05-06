@@ -1,13 +1,16 @@
 from typing import Literal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas import (
     CandidateRead,
     CandidateUpdate,
+    CandidateNotesUpdate,
+    CandidateSkillRead,
+    SkillPreferenceUpdate,
     InterviewRead,
     # request models
     InterviewCreate,
@@ -92,3 +95,42 @@ def update_candidate_interview(
         comment=payload.comment,
     )
     return InterviewRead.model_validate(updated)
+
+
+@router.patch("/{candidate_id}/notes", response_model=CandidateRead)
+def update_candidate_notes(
+    candidate_id: int,
+    payload: CandidateNotesUpdate,
+    db: Session = Depends(get_db),
+) -> CandidateRead:
+    try:
+        updated = CandidateService.update_notes(
+            db=db,
+            candidate_id=candidate_id,
+            notes=payload.notes,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return CandidateRead.model_validate(updated)
+
+
+@router.patch(
+    "/{candidate_id}/skills/preference",
+    response_model=CandidateSkillRead,
+)
+def update_skill_preference(
+    candidate_id: int,
+    skill_name: str,
+    payload: SkillPreferenceUpdate,
+    db: Session = Depends(get_db),
+) -> CandidateSkillRead:
+    try:
+        updated = CandidateService.update_skill_preference(
+            db=db,
+            candidate_id=candidate_id,
+            skill_name=skill_name,
+            preference=payload.preference,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return CandidateSkillRead.model_validate(updated)

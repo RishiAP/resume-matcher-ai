@@ -49,6 +49,7 @@ class Candidate(Base):
     summary_text = Column(Text)
     embedding = Column(Vector(EMBED_DIMENSIONS))
     structured_profile = Column(JSONB)
+    notes = Column(Text, nullable=True)
 
 
     created_at = Column(TIMESTAMP, server_default=func.now())
@@ -95,6 +96,12 @@ class Skill(Base):
     requirement_links = relationship("RequirementSkill", back_populates="skill")
 
 
+class SkillPreferenceEnum(str, PyEnum):
+    PREFERRED = "preferred"
+    NON_PREFERRED = "non_preferred"
+    UNKNOWN = "unknown"
+
+
 class CandidateSkill(Base):
     __tablename__ = "candidate_skill"
     __table_args__ = (
@@ -110,11 +117,21 @@ class CandidateSkill(Base):
     skill_id = Column(BigInteger, ForeignKey("skill.id", ondelete="CASCADE"), nullable=False)
     context = Column(String(20), nullable=False, server_default="mentioned")
     experience_months = Column(Integer)
+    preference = Column(
+        SAEnum(
+            SkillPreferenceEnum,
+            name="skill_preference",
+            create_type=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+            validate_strings=True,
+        ),
+        nullable=False,
+        server_default="unknown",
+    )
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     candidate = relationship("Candidate", back_populates="skill_links")
     skill = relationship("Skill", back_populates="candidate_links")
-
 
 class CandidateExperience(Base):
     __tablename__ = "candidate_experience"
@@ -236,6 +253,12 @@ class MatchResult(Base):
     reason = Column(Text)
     rrf_score = Column(DECIMAL(10, 6))
     created_at = Column(TIMESTAMP, server_default=func.now())
+
+
+class SkillPreferenceEnum(str, PyEnum):
+    PREFERRED = "preferred"
+    NON_PREFERRED = "non_preferred"
+    UNKNOWN = "unknown"
 
 
 class CandidateStatusEnum(str, PyEnum):

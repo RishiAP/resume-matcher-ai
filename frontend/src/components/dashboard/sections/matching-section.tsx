@@ -82,10 +82,11 @@ export function MatchingSection() {
 		Record<number, MatchResultRead["status"]>
 	>({})
 	const [matchAll, setMatchAll] = useState<boolean>(false)
+	const [showInactiveRequirements, setShowInactiveRequirements] = useState(false)
 
 	const requirementsQuery = useQuery<RequirementRead[]>({
-		queryKey: requirementsQueryKey,
-		queryFn: () => listRequirements(),
+		queryKey: [...requirementsQueryKey, showInactiveRequirements],
+		queryFn: () => listRequirements({ includeInactive: showInactiveRequirements }),
 		// Ensure requirements list is refetched when this view mounts
 		refetchOnMount: "always",
 	})
@@ -224,6 +225,8 @@ export function MatchingSection() {
 		)
 	}, [effectiveRequirementId, requirementsQuery.data])
 
+	const isSelectedRequirementInactive = selectedRequirement !== undefined && !selectedRequirement.is_active
+
 	const rankedCandidates = matchResultsQuery.data ?? []
 
 	function scoreColorClass(percent: number) {
@@ -245,6 +248,27 @@ export function MatchingSection() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-4">
+					<div className="flex items-center justify-between">
+						<div></div>
+						<div className="flex items-center gap-2">
+							<label className="text-sm text-muted-foreground">Show inactive requirements</label>
+							<Switch
+								aria-label="Show inactive requirements"
+								size="sm"
+								checked={showInactiveRequirements}
+								onCheckedChange={(val) => setShowInactiveRequirements(Boolean(val))}
+							/>
+						</div>
+					</div>
+					{isSelectedRequirementInactive ? (
+						<Alert>
+							<AlertCircleIcon className="size-4" />
+							<AlertTitle>Inactive requirement selected</AlertTitle>
+							<AlertDescription>
+								This requirement is visible for review only. Matching actions are disabled until you select an active requirement.
+							</AlertDescription>
+						</Alert>
+					) : null}
 					<Field orientation="responsive">
 						<FieldContent>
 							<FieldLabel htmlFor="matching-requirement">Requirement</FieldLabel>
@@ -274,7 +298,7 @@ export function MatchingSection() {
 										</SelectContent>
 									</Select>
 								</div>
-								<div className="flex items-center gap-1 flex-shrink-0">
+								<div className="flex items-center gap-1 shrink-0">
 									<label className="text-sm text-muted-foreground">Include all candidates</label>
 									<Switch
 										aria-label="Include all candidates"
@@ -305,32 +329,36 @@ export function MatchingSection() {
 							<Button
 								type="button"
 								disabled={
-									effectiveRequirementId === null || runMatchingMutation.isPending
+									effectiveRequirementId === null ||
+									runMatchingMutation.isPending ||
+									isSelectedRequirementInactive
 								}
 								onClick={() => {
-									if (effectiveRequirementId !== null) {
+									if (effectiveRequirementId !== null && !isSelectedRequirementInactive) {
 										runMatchingMutation.mutate({ requirementId: effectiveRequirementId, matchAll })
 									}
 								}}
 							>
 								{runMatchingMutation.isPending && (
 									<Loader2Icon className="animate-spin" />
-									)}
-								Run Matching
-								</Button>
-								<Button
-									type="button"
-									variant="outline"
-									disabled={effectiveRequirementId === null}
-									onClick={() => {
-										void matchResultsQuery.refetch()
-									}}
-								>
-									Refresh Results
-								</Button>
-								{selectedRequirement && (
-									<Badge className="ml-2" variant="secondary">{selectedRequirement.title}</Badge>
 								)}
+								Run Matching
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								disabled={effectiveRequirementId === null || isSelectedRequirementInactive}
+								onClick={() => {
+									void matchResultsQuery.refetch()
+								}}
+							>
+								Refresh Results
+							</Button>
+							{selectedRequirement && (
+								<Badge className="ml-2" variant="secondary">
+									{selectedRequirement.title}
+								</Badge>
+							)}
 						</div>
 					</div>
 				</CardContent>
@@ -354,7 +382,7 @@ export function MatchingSection() {
 									<Button
 										 type="button"
 										 variant="outline"
-										 disabled={rejectZeroMutation.isPending}
+										 disabled={rejectZeroMutation.isPending || isSelectedRequirementInactive}
 										 onClick={() => {
 											if (effectiveRequirementId !== null) {
 												rejectZeroMutation.mutate(effectiveRequirementId)
@@ -530,7 +558,7 @@ export function MatchingSection() {
 															status: value,
 														})
 													}}
-													disabled={updateStatusMutation.isPending}
+													disabled={updateStatusMutation.isPending || isSelectedRequirementInactive}
 												>
 													<SelectTrigger className="w-32">
 														<SelectValue placeholder="Set status" />
@@ -574,7 +602,7 @@ export function MatchingSection() {
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
-						<div className="flex flex-wrap items-center gap-3 items-baseline">
+						<div className="flex flex-wrap items-baseline gap-3">
 							<Badge variant={statusBadgeVariant(activeMatch.status)}>
 								Status: {statusLabel(activeMatch.status)}
 							</Badge>
@@ -589,7 +617,7 @@ export function MatchingSection() {
 							<Button
 								 type="button"
 								 variant="outline"
-								 disabled={updateStatusMutation.isPending}
+										 disabled={updateStatusMutation.isPending || isSelectedRequirementInactive}
 								 onClick={() => {
 									updateStatusMutation.mutate({
 										requirementId: effectiveRequirementId,
@@ -603,7 +631,7 @@ export function MatchingSection() {
 							<Button
 								 type="button"
 								 variant="outline"
-								 disabled={updateStatusMutation.isPending}
+										 disabled={updateStatusMutation.isPending || isSelectedRequirementInactive}
 								 onClick={() => {
 									updateStatusMutation.mutate({
 										requirementId: effectiveRequirementId,
@@ -633,7 +661,8 @@ export function MatchingSection() {
 								 variant="outline"
 								 disabled={
 									activeMatch.status !== "new" ||
-									runCandidateMatchingMutation.isPending
+											runCandidateMatchingMutation.isPending ||
+											isSelectedRequirementInactive
 								}
 								 onClick={() => {
 									if (activeMatch.status !== "new") return

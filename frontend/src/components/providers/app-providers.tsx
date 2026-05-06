@@ -10,6 +10,7 @@ import {
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthProvider } from "@/components/providers/auth-provider"
+import { CandidateProvider } from "@/context/candidate-context"
 import { Toaster } from "@/components/ui/sonner"
 
 type AppProvidersProps = {
@@ -31,10 +32,12 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          {children}
-          <Toaster position="top-center" richColors />
-        </TooltipProvider>
+        <CandidateProvider>
+          <TooltipProvider>
+            {children}
+            <Toaster position="top-center" richColors />
+          </TooltipProvider>
+        </CandidateProvider>
       </AuthProvider>
       {/* <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" /> */}
     </QueryClientProvider>

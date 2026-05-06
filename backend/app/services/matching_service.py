@@ -271,7 +271,10 @@ class MatchingService:
                     requirement=req_dict,
                     candidate={
                         "skills": [
-                            link.skill.name
+                            {
+                                "name": link.skill.name,
+                                "preference": link.preference.value if link.preference else "unknown",
+                            }
                             for link in (candidate.skill_links or [])
                             if link.skill is not None
                         ],

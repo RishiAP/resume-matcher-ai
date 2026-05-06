@@ -153,6 +153,7 @@ class CandidateSkillRead(BaseModel):
     context: Literal["primary", "secondary", "project", "mentioned"]
     experience_months: int | None = None
     experience_years: float | None = None
+    preference: Literal["preferred", "non_preferred", "unknown"] = "unknown"
 
 
 class InterviewRead(BaseModel):
@@ -273,11 +274,27 @@ class CandidateRead(BaseModel):
     experiences: list[CandidateExperienceRead] = Field(default_factory=list)
     projects: list[CandidateProjectRead] = Field(default_factory=list)
     educations: list[CandidateEducationRead] = Field(default_factory=list)
+    notes: str | None = None
 
 
 class CandidateUpdate(BaseModel):
     interview_date: date | None = None
     interview_time: str | None = None
+
+
+class CandidateNotesUpdate(BaseModel):
+    notes: str | None = Field(None, max_length=10000)
+
+    @field_validator("notes")
+    @classmethod
+    def coerce_empty_to_none(cls, value: str | None) -> str | None:
+        if value is not None and value.strip() == "":
+            return None
+        return value
+
+
+class SkillPreferenceUpdate(BaseModel):
+    preference: Literal["preferred", "non_preferred", "unknown"]
 
 
 class RequirementSkillInput(BaseModel):

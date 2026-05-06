@@ -1,6 +1,6 @@
 "use client"
 
-import { useId, useState } from "react"
+import { useId, useState, useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Controller, useForm } from "react-hook-form"
@@ -16,6 +16,8 @@ import { z } from "zod"
 import {
 	createCandidateInterview,
 	updateCandidateInterview,
+	updateCandidateNotes,
+	updateSkillPreference,
 	getApiErrorMessage,
 	listCandidates,
 	updateMatchStatus,
@@ -25,6 +27,7 @@ import {
 	type InterviewRead,
 	type RequirementRead,
 } from "@/lib/api-client"
+import { useCandidateContext, type CandidateWithEdits } from "@/context/candidate-context"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -110,6 +113,20 @@ type CandidateFilterValues = z.input<typeof candidateFiltersSchema>
 
 type SkillProfile = NonNullable<CandidateRead["skill_profiles"]>[number]
 
+type SkillPreference = "preferred" | "non_preferred" | "unknown"
+
+const PREFERENCE_CYCLE: Record<SkillPreference, SkillPreference> = {
+	unknown: "preferred",
+	preferred: "non_preferred",
+	non_preferred: "unknown",
+}
+
+const PREFERENCE_STYLES: Record<SkillPreference, string> = {
+	preferred: "border-emerald-400 bg-emerald-100 text-emerald-900 hover:bg-emerald-200",
+	non_preferred: "border-rose-300 bg-rose-100/60 text-rose-800 hover:bg-rose-200/60",
+	unknown: "border-border bg-muted/40 text-muted-foreground hover:bg-muted/60",
+}
+
 type InterviewItem = {
 	id: number
 	comment?: string | null
@@ -150,27 +167,91 @@ function dedupeSkillNames(skills: string[] | null | undefined): string[] {
 	return unique
 }
 
-function buildOrderedSkills(candidate: CandidateRead | null | undefined): {
-	matched: string[]
-	remaining: string[]
-} {
-	if (!candidate) {
-		return { matched: [], remaining: [] }
+type SkillOverviewItem = {
+	name: string
+	preference: SkillPreference
+	isFiltered: boolean
+}
+
+const skillPreferenceRank: Record<SkillPreference, number> = {
+	preferred: 0,
+	unknown: 1,
+	non_preferred: 2,
+}
+
+const skillPreferenceBadgeClass: Record<SkillPreference, string> = {
+	preferred: "border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
+	non_preferred: "border-rose-300 bg-rose-100 text-rose-900 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200",
+	unknown: "border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-300",
+}
+
+const filteredSkillBadgeClass =
+	"border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200"
+
+function skillBadgeClassName(item: SkillOverviewItem): string {
+	return item.isFiltered ? filteredSkillBadgeClass : skillPreferenceBadgeClass[item.preference]
+}
+
+function sortSkillOverviewItems(
+	items: SkillOverviewItem[],
+	options: { prioritizeFiltered: boolean }
+): SkillOverviewItem[] {
+	const preferredItems = items.filter((item) => item.preference === "preferred")
+	const nonPreferredItems = items.filter((item) => item.preference === "non_preferred")
+	const unknownItems = items.filter((item) => item.preference === "unknown")
+
+	if (options.prioritizeFiltered) {
+		return [...items].sort((a, b) => {
+			if (a.isFiltered !== b.isFiltered) {
+				return a.isFiltered ? -1 : 1
+			}
+			return skillPreferenceRank[a.preference] - skillPreferenceRank[b.preference]
+		})
 	}
 
-	const matched = dedupeSkillNames(candidate.matched_skills)
-	const ranked = dedupeSkillNames(
-		rankSkillsByMonths(candidate.skill_profiles, candidate.skills)
+	if (preferredItems.length > 0) {
+		return [...preferredItems, ...unknownItems, ...nonPreferredItems]
+	}
+
+	return [...items]
+}
+
+function buildSkillOverviewItems(candidate: CandidateRead | null | undefined): SkillOverviewItem[] {
+	if (!candidate) {
+		return []
+	}
+
+	const matchedSet = new Set(
+		dedupeSkillNames(candidate.matched_skills).map((skill) => skill.toLowerCase())
+	)
+	const preferenceBySkill = new Map(
+		(candidate.skill_profiles ?? []).map((profile) => [
+			profile.name.toLowerCase(),
+			(profile.preference ?? "unknown") as SkillPreference,
+		])
 	)
 
-	const matchedSet = new Set(matched.map((skill) => skill.toLowerCase()))
+	return rankSkillsByMonths(candidate.skill_profiles, candidate.skills).map((name) => ({
+		name,
+		preference: preferenceBySkill.get(name.toLowerCase()) ?? "unknown",
+		isFiltered: matchedSet.has(name.toLowerCase()),
+	}))
+}
 
-	const remaining = ranked.filter((skill) => {
-		const key = skill.toLowerCase()
-		return !matchedSet.has(key)
-	})
+// Helper to apply context skill preferences to candidate for display
+function applyContextPreferencesToCandidate(
+	candidate: CandidateRead | CandidateWithEdits | null | undefined,
+	contextFn: (candidateId: number, skillName: string) => "preferred" | "non_preferred" | "unknown" | undefined
+): CandidateRead | null | undefined {
+	if (!candidate) return candidate
 
-	return { matched, remaining }
+	return {
+		...candidate,
+		skill_profiles: (candidate.skill_profiles ?? []).map((profile) => {
+			const contextPref = contextFn(candidate.id, profile.name)
+			return contextPref ? { ...profile, preference: contextPref as SkillPreference } : profile
+		}),
+	}
 }
 
 function toSkillMonths(profile: SkillProfile): number {
@@ -299,8 +380,86 @@ function candidateQueryKey(filters?: CandidateFilters): readonly [
 	] as const
 }
 
+function SkillPreferenceChip({
+	skillName,
+	preference,
+	candidateId,
+	isSelected,
+	onToggleSelect,
+	onPreferenceChange,
+}: {
+	skillName: string
+	preference: SkillPreference
+	candidateId: number
+	isSelected?: boolean
+	onToggleSelect?: (skillName: string) => void
+	onPreferenceChange?: (skillName: string, newPreference: SkillPreference) => void
+}) {
+	const [localPreference, setLocalPreference] = useState<SkillPreference>(preference)
+	const [isPending, setIsPending] = useState(false)
+	const candidateContext = useCandidateContext()
+
+	// Sync when parent preference changes (e.g. bulk update)
+	useEffect(() => {
+		if (!isPending && localPreference !== preference) {
+			setLocalPreference(preference)
+		}
+	}, [isPending, localPreference, preference])
+
+	const handleClick = async () => {
+		if (onToggleSelect) {
+			// Bulk-select mode: clicking toggles selection
+			onToggleSelect(skillName)
+			return
+		}
+
+		const nextPreference = PREFERENCE_CYCLE[localPreference]
+		const prevPreference = localPreference
+
+		// Optimistic update
+		setLocalPreference(nextPreference)
+		setIsPending(true)
+
+		try {
+			await updateSkillPreference(candidateId, skillName, nextPreference)
+			// Also update context so preference is reflected across modals
+			candidateContext.updateSkillPreference(candidateId, skillName, nextPreference)
+			onPreferenceChange?.(skillName, nextPreference)
+		} catch {
+			// Revert on failure
+			setLocalPreference(prevPreference)
+			toast.error("Failed to update skill preference", {
+				description: "Could not save the preference change. Please try again.",
+			})
+		} finally {
+			setIsPending(false)
+		}
+	}
+
+	const chipStyle = PREFERENCE_STYLES[localPreference]
+	const isChecked = isSelected ?? false
+
+	return (
+		<button
+			type="button"
+			onClick={handleClick}
+			disabled={isPending}
+			aria-pressed={isChecked}
+			className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors cursor-pointer select-none ${chipStyle} ${isPending ? "opacity-60" : ""}`}
+		>
+			{onToggleSelect ? (
+				<span
+					className={`inline-block size-3 rounded-sm border ${isChecked ? "bg-primary border-primary" : "border-muted-foreground"}`}
+					aria-hidden="true"
+				/>
+			) : null}
+			{skillName}
+		</button>
+	)
+}
+
 function CandidateViewModal({
-	candidate,
+	candidate: initialCandidate,
 	onClose,
 	onEdit,
 	isReadOnly,
@@ -310,7 +469,133 @@ function CandidateViewModal({
 	onEdit: (candidate: CandidateWithInterviews) => void
 	isReadOnly?: boolean
 }) {
-	const orderedSkills = buildOrderedSkills(candidate)
+	const queryClient = useQueryClient()
+	const candidateContext = useCandidateContext()
+	const { updateCandidate, getCandidate } = candidateContext
+	const [localCandidate, setLocalCandidate] = useState<CandidateWithInterviews | null>(initialCandidate)
+	const [selectedSkills, setSelectedSkills] = useState<Set<string>>(new Set())
+	const [bulkPreference, setBulkPreference] = useState<SkillPreference>("preferred")
+	const [isBulkApplying, setIsBulkApplying] = useState(false)
+
+	// Sync when parent candidate changes (e.g. modal opened for a different candidate)
+	useEffect(() => {
+		if (initialCandidate) {
+			// Preserve any existing edits when syncing to a new candidate
+			const existingCandidate = getCandidate(initialCandidate.id)
+			if (existingCandidate?._isDirty && existingCandidate._edits) {
+				updateCandidate({
+					...initialCandidate,
+					_edits: existingCandidate._edits,
+					_isDirty: true,
+				} as CandidateWithEdits)
+			} else {
+				updateCandidate(initialCandidate as CandidateWithEdits)
+			}
+		}
+		setLocalCandidate(initialCandidate)
+		setSelectedSkills(new Set())
+		// Only depend on initialCandidate - updateCandidate and getCandidate are stable refs from context
+		// Avoid infinite loop from context state updates changing their references
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [initialCandidate])
+
+	const candidate =
+		(initialCandidate ? candidateContext.getCandidate(initialCandidate.id) : undefined) ??
+		localCandidate
+
+	// Sort skill_profiles by preference order: preferred → unknown → non_preferred
+	const PREF_ORDER: Record<SkillPreference, number> = { preferred: 0, unknown: 1, non_preferred: 2 }
+	const sortedSkillProfiles = [...(candidate?.skill_profiles ?? [])].sort(
+		(a, b) => {
+			const aContext = candidate ? candidateContext.getSkillPreference(candidate.id, a.name) : undefined
+			const bContext = candidate ? candidateContext.getSkillPreference(candidate.id, b.name) : undefined
+			const aPref = (aContext ?? (a.preference ?? "unknown")) as SkillPreference
+			const bPref = (bContext ?? (b.preference ?? "unknown")) as SkillPreference
+			return PREF_ORDER[aPref] - PREF_ORDER[bPref]
+		}
+	)
+
+	const handlePreferenceChange = (skillName: string, newPreference: SkillPreference) => {
+		const candidateId = localCandidate?.id
+		if (candidateId == null) return
+
+		setLocalCandidate((cur) => {
+			if (!cur) return cur
+			return {
+				...cur,
+				skill_profiles: (cur.skill_profiles ?? []).map((sp) =>
+					sp.name.toLowerCase() === skillName.toLowerCase()
+						? { ...sp, preference: newPreference }
+						: sp
+				),
+			}
+		})
+		candidateContext.updateSkillPreference(candidateId, skillName, newPreference)
+		// Also update the query cache so the table reflects the change
+		queryClient.setQueryData(["candidates"], (old: CandidateRead[] | undefined) =>
+			old?.map((c) =>
+				c.id === candidateId
+					? {
+						...c,
+						skill_profiles: (c.skill_profiles ?? []).map((sp) =>
+							sp.name.toLowerCase() === skillName.toLowerCase()
+								? { ...sp, preference: newPreference }
+								: sp
+						),
+					}
+					: c
+			)
+		)
+	}
+
+	const handleToggleSelect = (skillName: string) => {
+		setSelectedSkills((cur) => {
+			const next = new Set(cur)
+			if (next.has(skillName)) {
+				next.delete(skillName)
+			} else {
+				next.add(skillName)
+			}
+			return next
+		})
+	}
+
+	const handleSelectAll = () => {
+		setSelectedSkills(new Set((candidate?.skill_profiles ?? []).map((sp) => sp.name)))
+	}
+
+	const handleClearSelection = () => {
+		setSelectedSkills(new Set())
+	}
+
+	const handleBulkApply = async () => {
+		if (!candidate || selectedSkills.size === 0) return
+		setIsBulkApplying(true)
+		const skillsToUpdate = [...selectedSkills]
+		try {
+			await Promise.all(
+				skillsToUpdate.map((skillName) =>
+					updateSkillPreference(candidate.id, skillName, bulkPreference)
+				)
+			)
+			// Update local state for all selected skills
+			for (const skillName of skillsToUpdate) {
+				handlePreferenceChange(skillName, bulkPreference)
+			}
+			setSelectedSkills(new Set())
+			toast.success("Preferences updated", {
+				description: `Applied "${bulkPreference}" to ${skillsToUpdate.length} skill(s).`,
+			})
+		} catch {
+			// Revert all chips by re-reading from the server would require a refetch;
+			// instead show error and let user retry
+			toast.error("Bulk update failed", {
+				description: "Some preferences could not be saved. Please try again.",
+			})
+		} finally {
+			setIsBulkApplying(false)
+		}
+	}
 
 	return (
 		<CustomModal
@@ -450,37 +735,109 @@ function CandidateViewModal({
 						<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
 							Skills
 						</p>
-						{orderedSkills.matched.length || orderedSkills.remaining.length ? (
+						{sortedSkillProfiles.length ? (
 							<div className="mt-3 space-y-3">
-								{orderedSkills.matched.length ? (
-									<div className="flex flex-wrap gap-2">
-										{orderedSkills.matched.map((skill) => (
-											<Badge
-												key={`candidate-view-${candidate.id}-matched-${skill}`}
-												className="border border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
-											>
-												{skill}
-											</Badge>
-										))}
+								{/* Bulk-select toolbar — shown when at least one chip is selected */}
+								{selectedSkills.size > 0 ? (
+									<div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-2">
+										<span className="text-xs text-muted-foreground">
+											{selectedSkills.size} selected
+										</span>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											className="h-7 text-xs"
+											onClick={handleSelectAll}
+										>
+											Select All
+										</Button>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											className="h-7 text-xs"
+											onClick={handleClearSelection}
+										>
+											Clear
+										</Button>
+										<Select
+											value={bulkPreference}
+											onValueChange={(v) => setBulkPreference(v as SkillPreference)}
+										>
+											<SelectTrigger className="h-7 w-36 text-xs">
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="preferred">Preferred</SelectItem>
+												<SelectItem value="non_preferred">Non-Preferred</SelectItem>
+												<SelectItem value="unknown">Unknown</SelectItem>
+											</SelectContent>
+										</Select>
+										<Button
+											type="button"
+											size="sm"
+											className="h-7 text-xs"
+											disabled={isBulkApplying}
+											onClick={handleBulkApply}
+										>
+											{isBulkApplying ? <Loader2Icon className="animate-spin size-3" /> : null}
+											Apply
+										</Button>
 									</div>
-								) : null}
-								{orderedSkills.remaining.length ? (
-									<div className="flex flex-wrap gap-2">
-										{orderedSkills.remaining.map((skill) => (
-											<Badge
-												key={`candidate-view-${candidate.id}-remaining-${skill}`}
-												variant="secondary"
-											>
-												{skill}
-											</Badge>
-										))}
+								) : (
+									<div className="flex justify-end">
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											className="h-7 text-xs"
+											onClick={handleSelectAll}
+										>
+											Select All
+										</Button>
 									</div>
-								) : null}
+								)}
+								<div className="flex flex-wrap gap-2">
+									{sortedSkillProfiles.map((sp) => {
+										const contextPref = candidate ? candidateContext.getSkillPreference(candidate.id, sp.name) : undefined
+										const pref = (contextPref ?? (sp.preference ?? "unknown")) as SkillPreference
+										return (
+											<SkillPreferenceChip
+												key={`view-chip-${candidate!.id}-${sp.name}`}
+												skillName={sp.name}
+												preference={pref}
+												candidateId={candidate!.id}
+												isSelected={selectedSkills.has(sp.name)}
+												onToggleSelect={selectedSkills.size > 0 ? handleToggleSelect : undefined}
+												onPreferenceChange={handlePreferenceChange}
+											/>
+										)
+									})}
+								</div>
 							</div>
 						) : (
 							<p className="mt-3 text-sm text-muted-foreground">
 								Skills were not extracted for this profile.
 							</p>
+						)}
+					</div>
+
+					<div className="rounded-xl border border-border/70 bg-card p-4">
+						<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+							Notes
+						</p>
+						{candidate ? (() => {
+							const notes = candidateContext.getCandidateNotes(candidate.id) ?? candidate.notes
+							return notes ? (
+								<p className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+									{notes}
+								</p>
+							) : (
+								<p className="mt-3 text-sm text-muted-foreground italic">No notes</p>
+							)
+						})() : (
+							<p className="mt-3 text-sm text-muted-foreground italic">No notes</p>
 						)}
 					</div>
 
@@ -638,8 +995,18 @@ function CandidateEditModal({
 	) => Promise<InterviewRead>
 }) {
 	const formId = useId()
+	const queryClient = useQueryClient()
+	const candidateContext = useCandidateContext()
 	const [localInterviews, setLocalInterviews] = useState<InterviewItem[]>(() => deriveInterviews(candidate))
 	const [tempIdCounter, setTempIdCounter] = useState(-1)
+	const [isSavingNotes, setIsSavingNotes] = useState(false)
+
+	// Sync interviews when candidate changes (e.g., modal opened for a different candidate)
+	useEffect(() => {
+		if (candidate) {
+			setLocalInterviews(deriveInterviews(candidate))
+		}
+	}, [candidate])
 
 	const sortedInterviews = [...localInterviews].sort((a, b) =>
 		interviewDateTimeValue(b.interview_date, b.interview_time, b.created_at) -
@@ -841,6 +1208,76 @@ function CandidateEditModal({
 						</div>
 					)}
 				</div>
+
+				<div>
+					<div className="mb-3 flex items-center justify-between">
+						<div>
+							<p className="text-sm font-semibold">Candidate Notes</p>
+							<p className="text-xs text-muted-foreground">
+								Record observations, follow-up actions, or other context about this candidate.
+							</p>
+						</div>
+					</div>
+
+					<div className="rounded-lg border border-border/60 bg-card p-4 space-y-3">
+						<Field>
+							<FieldLabel>Notes</FieldLabel>
+							<Textarea
+								value={candidate ? (candidateContext.getCandidateNotes(candidate.id) ?? "") : ""}
+								onChange={(e) => {
+									if (candidate) {
+										candidateContext.updateCandidateNotes(candidate.id, e.target.value || null)
+									}
+								}}
+								placeholder="Add notes about this candidate..."
+								className="min-h-32"
+							/>
+							<FieldDescription>
+								Maximum 10,000 characters. Leave empty for no notes.
+							</FieldDescription>
+						</Field>
+						<div className="flex justify-end">
+							<Button
+								type="button"
+								size="sm"
+								disabled={isSavingNotes || !candidate?.id || !candidateContext.getCandidate(candidate.id)?._isDirty}
+								onClick={async () => {
+									if (!candidate) return
+									const contextCandidate = candidateContext.getCandidate(candidate.id)
+									if (!contextCandidate?._isDirty) return
+									
+									setIsSavingNotes(true)
+									try {
+										const notes = candidateContext.getCandidateNotes(candidate.id) ?? null
+										const updated = await updateCandidateNotes(candidate.id, notes)
+										// Update query cache so other components reflect the change
+										queryClient.setQueryData(["candidates"], (old: CandidateRead[] | undefined) =>
+											old?.map((c) =>
+												c.id === candidate.id
+													? { ...c, notes: updated.notes }
+													: c
+											)
+										)
+										// Clear edits in context after successful save
+										candidateContext.clearEdits(candidate.id)
+										toast.success("Notes saved", {
+											description: "Candidate notes have been updated.",
+										})
+									} catch (error) {
+										toast.error("Failed to save notes", {
+											description: getApiErrorMessage(error),
+										})
+									} finally {
+										setIsSavingNotes(false)
+									}
+								}}
+							>
+								{isSavingNotes ? <Loader2Icon className="animate-spin" /> : null}
+								Save Notes
+							</Button>
+						</div>
+					</div>
+				</div>
 			</div>
 		</CustomModal>
 	)
@@ -848,6 +1285,7 @@ function CandidateEditModal({
 
 export function CandidatesSection() {
 	const queryClient = useQueryClient()
+	const candidateContext = useCandidateContext()
 
 	const [filters, setFilters] = useState<CandidateFilters>({})
 	const [selectedRequirementId, setSelectedRequirementId] =
@@ -899,6 +1337,15 @@ export function CandidatesSection() {
 		// Always refetch when this component mounts (e.g. user navigates to page)
 		refetchOnMount: "always",
 	})
+
+	const { syncCandidatesFromAPI } = candidateContext
+
+	// Sync candidates from API to context
+	useEffect(() => {
+		if (candidatesQuery.data) {
+			syncCandidatesFromAPI(candidatesQuery.data)
+		}
+	}, [candidatesQuery.data, syncCandidatesFromAPI])
 
 	const updateRequirementStatusMutation = useMutation({
 		mutationFn: async (variables: {
@@ -1354,14 +1801,17 @@ export function CandidatesSection() {
 							</TableHeader>
 							<TableBody>
 								{candidatesQuery.data?.map((candidate) => {
-									const orderedSkills = buildOrderedSkills(candidate)
-									const visibleSkills = [
-										...orderedSkills.matched,
-										...orderedSkills.remaining,
-									].slice(0, 3)
-									const matchedSet = new Set(
-										orderedSkills.matched.map((skill) => skill.toLowerCase())
+									const contextCandidate = candidateContext.getCandidate(candidate.id) ?? candidate
+									// Apply context skill preferences for display
+									const candidateWithContextPrefs = applyContextPreferencesToCandidate(
+										contextCandidate,
+										(candidateId, skillName) => candidateContext.getSkillPreference(candidateId, skillName)
 									)
+									const skillOverviewItems = buildSkillOverviewItems(candidateWithContextPrefs)
+									const orderedSkillOverviewItems = sortSkillOverviewItems(skillOverviewItems, {
+										prioritizeFiltered: hasActiveSkillFilter,
+									})
+									const visibleSkills = orderedSkillOverviewItems.slice(0, 3)
 
 									return (
 										<TableRow key={candidate.id}>
@@ -1377,28 +1827,28 @@ export function CandidatesSection() {
 														<div className="flex max-w-70 flex-wrap gap-1 cursor-pointer">
 															{visibleSkills.map((skill) => (
 																<Badge
-																	key={`candidate-skills-inline-${candidate.id}-${skill}`}
-																	variant={matchedSet.has(skill.toLowerCase()) ? undefined : "secondary"}
-																	className={matchedSet.has(skill.toLowerCase()) ? "border border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-100" : undefined}
+																	key={`candidate-skills-inline-${candidate.id}-${skill.name}`}
+																	variant="outline"
+																	className={skillBadgeClassName(skill)}
 																>
-																	{skill}
+																	<span className="max-w-40 truncate">{skill.name}</span>
 																</Badge>
 															))}
-															{orderedSkills.matched.length + orderedSkills.remaining.length > 3 && (
+															{orderedSkillOverviewItems.length > 3 && (
 																<Badge variant="outline">
-																	+{orderedSkills.matched.length + orderedSkills.remaining.length - 3}
+																	+{orderedSkillOverviewItems.length - 3}
 																</Badge>
 															)}
 														</div>
 													</TooltipTrigger>
 													<TooltipContent sideOffset={8} className="flex flex-wrap gap-1 bg-background text-foreground">
-														{[...orderedSkills.matched, ...orderedSkills.remaining].map((skill) => (
+														{orderedSkillOverviewItems.map((skill) => (
 															<Badge
-																key={`candidate-skills-tooltip-${candidate.id}-${skill}`}
-																variant={matchedSet.has(skill.toLowerCase()) ? undefined : "outline"}
-																className={matchedSet.has(skill.toLowerCase()) ? "border border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-100" : undefined}
+																key={`candidate-skills-tooltip-${candidate.id}-${skill.name}`}
+																variant="outline"
+																className={skillBadgeClassName(skill)}
 															>
-																{skill}
+																<span className="max-w-40 truncate">{skill.name}</span>
 															</Badge>
 														))}
 													</TooltipContent>

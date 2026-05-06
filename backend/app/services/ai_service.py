@@ -192,10 +192,29 @@ Requirement text:
         req_qualification = str(requirement.get("qualification") or "").strip()
         req_notes = str(requirement.get("notes") or "").strip()
 
+        candidate_skills_raw = candidate.get("skills") or []
+        candidate_skill_parts: list[str] = []
+        for item in candidate_skills_raw:
+            if isinstance(item, dict):
+                name = str(item.get("name") or "").strip()
+                pref = str(item.get("preference") or "unknown")
+                if not name:
+                    continue
+                if pref == "preferred":
+                    candidate_skill_parts.append(f"{name} [PREFERRED]")
+                elif pref == "non_preferred":
+                    candidate_skill_parts.append(f"{name} [NON-PREFERRED]")
+                else:
+                    candidate_skill_parts.append(name)
+            elif isinstance(item, str):
+                # Backward-compatible: plain string skills have no annotation
+                if item.strip():
+                    candidate_skill_parts.append(item.strip())
+
         prompt = f"""Rate fit. Return JSON: {{"score": 0-100, "reason": "one sentence"}}
-Priority: 1) Skills 2) Role 3) Exp 4) Qual
+Priority: 1) Skills (PREFERRED skills are highly desirable; NON-PREFERRED skills are undesirable) 2) Role 3) Exp 4) Qual
 Job: {req_title} Skills: {", ".join(skill_requirements_text)} Exp: {req_min_exp}-{req_max_exp}
-Candidate: Skills: {", ".join(candidate.get("skills") or [])} Exp: {candidate.get("experience_years")}"""
+Candidate: Skills: {", ".join(candidate_skill_parts)} Exp: {candidate.get("experience_years")}"""
 
         response = cls._create_chat_completion(
             model=settings.resolved_llm_model,

@@ -4,9 +4,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Candidate, CandidateSkill, CandidateStatus, Interview
+from app.models import Candidate, CandidateSkill, CandidateStatus, Interview, Skill
 from app.services.experience_calculator import (
     calculate_role_experience_months,
     calculate_skill_experience_months,
@@ -17,6 +18,8 @@ class CandidateService:
     _EXPERIENCE_FILTER_PATTERN = re.compile(
         r"^\s*(?P<name>.+?)\s*(?:>=|>|:)\s*(?P<years>\d+(?:\.\d+)?)\s*$"
     )
+
+    _PREFERENCE_ORDER: dict[str, int] = {"preferred": 0, "unknown": 1, "non_preferred": 2}
 
     @staticmethod
     def _normalize_skill_filters(skills: list[str] | None) -> list[str]:
@@ -413,6 +416,54 @@ class CandidateService:
         return float(value)
 
     @staticmethod
+    def update_notes(db: Session, candidate_id: int, notes: str | None) -> dict:
+        candidate = db.get(Candidate, candidate_id)
+        if not candidate:
+            raise LookupError(f"Candidate {candidate_id} not found")
+        # Coerce empty/whitespace to None
+        if notes is not None and notes.strip() == "":
+            notes = None
+        candidate.notes = notes
+        db.commit()
+        db.refresh(candidate)
+        return CandidateService._to_dict(candidate)
+
+    @staticmethod
+    def update_skill_preference(
+        db: Session,
+        candidate_id: int,
+        skill_name: str,
+        preference: str,
+    ) -> dict:
+        link = (
+            db.query(CandidateSkill)
+            .join(CandidateSkill.skill)
+            .filter(
+                CandidateSkill.candidate_id == candidate_id,
+                func.lower(Skill.name) == skill_name.lower(),
+            )
+            .first()
+        )
+        if not link:
+            raise LookupError(
+                f"Skill '{skill_name}' not found for candidate {candidate_id}"
+            )
+        link.preference = preference
+        db.commit()
+        db.refresh(link)
+        return {
+            "name": link.skill.name,
+            "context": link.context,
+            "experience_months": link.experience_months,
+            "experience_years": (
+                round(link.experience_months / 12, 2)
+                if link.experience_months is not None
+                else None
+            ),
+            "preference": link.preference.value if link.preference else "unknown",
+        }
+
+    @staticmethod
     def _to_date(value: date | None) -> str | None:
         if not value:
             return None
@@ -434,8 +485,8 @@ class CandidateService:
                     if link.experience_months is not None
                     else None
                 ),
+                "preference": link.preference.value if link.preference else "unknown",
             }
-
         sorted_experiences = sorted(
             candidate.experiences or [],
             key=lambda experience: (experience.sort_order or 0, experience.id or 0),
@@ -451,6 +502,9 @@ class CandidateService:
         sorted_skill_links = sorted(
             [link for link in (candidate.skill_links or []) if link.skill is not None],
             key=lambda link: (
+                CandidateService._PREFERENCE_ORDER.get(
+                    link.preference.value if link.preference else "unknown", 1
+                ),
                 link.experience_months is None,
                 -(link.experience_months or 0),
                 link.skill.name.lower(),
@@ -513,6 +567,7 @@ class CandidateService:
             ],
             "created_at": candidate.created_at.isoformat() if candidate.created_at else None,
             "structured_profile": candidate.structured_profile,
+            "notes": candidate.notes,
             "skill_profiles": [serialized_skill_profile(link) for link in sorted_skill_links],
             "experiences": [
                 {

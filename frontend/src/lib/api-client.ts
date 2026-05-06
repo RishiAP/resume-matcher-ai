@@ -205,6 +205,7 @@ export type CandidateSkillProfile = {
   context: "primary" | "secondary" | "project" | "mentioned"
   experience_months?: number | null
   experience_years?: number | null
+  preference: "preferred" | "non_preferred" | "unknown"
 }
 
 export type CandidateRead = {
@@ -245,6 +246,7 @@ export type CandidateRead = {
   educations?: CandidateEducation[]
   /** Per-requirement status when `requirement_id` is passed to the list endpoint. */
   requirement_status?: "not_applied" | "new" | "processing" | "rejected" | "hired" | null
+  notes?: string | null
 }
 
 export type CandidateUpdate = {
@@ -500,6 +502,30 @@ export async function updateCandidateInterview(
   const response = await apiClient.patch<InterviewRead>(
     `/api/candidates/${candidateId}/interviews/${interviewId}`,
     payload
+  )
+  return response.data
+}
+
+export async function updateCandidateNotes(
+  candidateId: number,
+  notes: string | null
+): Promise<CandidateRead> {
+  const response = await apiClient.patch<CandidateRead>(
+    `/api/candidates/${candidateId}/notes`,
+    { notes }
+  )
+  return response.data
+}
+
+export async function updateSkillPreference(
+  candidateId: number,
+  skillName: string,
+  preference: "preferred" | "non_preferred" | "unknown"
+): Promise<CandidateSkillProfile> {
+  // Use query parameter for skill name to avoid issues with slashes in path parameters
+  const response = await apiClient.patch<CandidateSkillProfile>(
+    `/api/candidates/${candidateId}/skills/preference?skill_name=${encodeURIComponent(skillName)}`,
+    { preference }
   )
   return response.data
 }
