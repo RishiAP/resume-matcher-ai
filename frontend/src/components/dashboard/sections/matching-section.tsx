@@ -496,19 +496,20 @@ export function MatchingSection() {
 							</AlertDescription>
 						</Alert>
 					) : (
-						<Table>
-							<TableHeader>
-								<TableRow>
-										<TableHead>Candidate</TableHead>
-										<TableHead>Experience</TableHead>
-										<TableHead>Location</TableHead>
-										<TableHead>Score</TableHead>
-										{showStatusColumn && <TableHead>Status</TableHead>}
-										<TableHead>Reason</TableHead>
-										<TableHead className="text-right">Actions</TableHead>
-									</TableRow>
-							</TableHeader>
-							<TableBody>
+						<div className="max-h-96 w-full overflow-y-auto rounded-md border">
+							<Table>
+							<TableHeader className="[&_tr]:sticky [&_tr]:top-0 [&_tr]:bg-background [&_tr]:z-10">
+									<TableRow>
+											<TableHead>Candidate</TableHead>
+											<TableHead>Experience</TableHead>
+											<TableHead>Location</TableHead>
+											<TableHead>Score</TableHead>
+											{showStatusColumn && <TableHead>Status</TableHead>}
+											<TableHead>Reason</TableHead>
+											<TableHead className="text-right">Actions</TableHead>
+										</TableRow>
+								</TableHeader>
+								<TableBody>
 								{rankedCandidates.map((result: MatchResultRead) => (
 									<TableRow key={`match-${result.candidate.id}`}>
 										<TableCell className="font-medium">
@@ -587,7 +588,8 @@ export function MatchingSection() {
 								))}
 							</TableBody>
 						</Table>
-					)}
+					</div>
+				)}
 				</CardContent>
 			</Card>
 

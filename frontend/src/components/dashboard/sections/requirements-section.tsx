@@ -508,22 +508,23 @@ export function RequirementsSection() {
 								{getApiErrorMessage(requirementsQuery.error)}
 							</AlertDescription>
 						</Alert>
-					) : (
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Requirement #</TableHead>
-									<TableHead>Role</TableHead>
-									<TableHead>Skills</TableHead>
-									<TableHead>Experience</TableHead>
-									<TableHead>Location</TableHead>
-									<TableHead>Min / Max CTC</TableHead>
-									<TableHead>Qualification</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead className="text-right">Action</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
+						) : (
+						<div className="max-h-96 w-full overflow-y-auto rounded-md border">
+							<Table>
+								<TableHeader className="[&_tr]:sticky [&_tr]:top-0 [&_tr]:bg-background [&_tr]:z-10">
+									<TableRow>
+										<TableHead>Requirement #</TableHead>
+										<TableHead>Role</TableHead>
+										<TableHead>Skills</TableHead>
+										<TableHead>Experience</TableHead>
+										<TableHead>Location</TableHead>
+										<TableHead>Min / Max CTC</TableHead>
+										<TableHead>Qualification</TableHead>
+										<TableHead>Status</TableHead>
+										<TableHead className="text-right">Action</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
 								{sortedRequirements.map((requirement) => {
 									const isActive = requirement.is_active ?? true
 									const badgeStyles = isActive
@@ -601,8 +602,9 @@ export function RequirementsSection() {
 										</TableRow>
 									)
 								})}
-							</TableBody>
-						</Table>
+								</TableBody>
+							</Table>
+						</div>
 					)}
 				</CardContent>
 			</Card>

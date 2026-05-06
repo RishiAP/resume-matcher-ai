@@ -1143,7 +1143,7 @@ function CandidateEditModal({
 											</Field>
 										</div>
 										<Field>
-											<FieldLabel>Notes</FieldLabel>
+											<FieldLabel>HR Comment</FieldLabel>
 											<Textarea
 												value={iv.comment ?? ""}
 												onChange={(e) => setLocalInterviews((cur) => cur.map((x) => x.id === iv.id ? { ...x, comment: e.target.value } : x))}
@@ -1151,7 +1151,24 @@ function CandidateEditModal({
 												className="min-h-24"
 											/>
 										</Field>
-										<div className="flex justify-end">
+										<div className="flex justify-end gap-2">
+											{hasChanges ? (
+												<Button
+													type="button"
+													size="sm"
+													variant="outline"
+													onClick={() => {
+														// Revert this interview to original state
+														const originalInterviews = deriveInterviews(candidate)
+														const originalInterview = originalInterviews.find(x => x.id === iv.id)
+														if (originalInterview) {
+															setLocalInterviews((cur) => cur.map((x) => x.id === iv.id ? originalInterview : x))
+														}
+													}}
+												>
+													Cancel
+												</Button>
+											) : null}
 											<Button
 												type="button"
 												size="sm"
@@ -1236,7 +1253,22 @@ function CandidateEditModal({
 								Maximum 10,000 characters. Leave empty for no notes.
 							</FieldDescription>
 						</Field>
-						<div className="flex justify-end">
+						<div className="flex justify-end gap-2">
+							{candidate && candidateContext.getCandidate(candidate.id)?._isDirty ? (
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									onClick={() => {
+										if (!candidate) return
+										// Revert notes to original candidate.notes value
+										candidateContext.updateCandidateNotes(candidate.id, candidate.notes ?? null)
+										candidateContext.clearEdits(candidate.id)
+									}}
+								>
+									Cancel
+								</Button>
+							) : null}
 							<Button
 								type="button"
 								size="sm"
@@ -1784,22 +1816,23 @@ export function CandidatesSection() {
 								</div>
 							) : null}
 						</Alert>
-					) : (
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Name</TableHead>
-									<TableHead>Experience</TableHead>
-									<TableHead>Location</TableHead>
-									<TableHead>Skills</TableHead>
-									<TableHead>Email</TableHead>
-									<TableHead>Phone Number</TableHead>
-									<TableHead>Qualification</TableHead>
-									{showStatusColumn && <TableHead>Status</TableHead>}
-									<TableHead className="text-right">Action</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
+						) : (
+						<div className="max-h-96 w-full overflow-y-auto rounded-md border">
+							<Table>
+								<TableHeader className="[&_tr]:sticky [&_tr]:top-0 [&_tr]:bg-background [&_tr]:z-10">
+									<TableRow>
+										<TableHead>Name</TableHead>
+										<TableHead>Experience</TableHead>
+										<TableHead>Location</TableHead>
+										<TableHead>Skills</TableHead>
+										<TableHead>Email</TableHead>
+										<TableHead>Phone Number</TableHead>
+										<TableHead>Qualification</TableHead>
+										{showStatusColumn && <TableHead>Status</TableHead>}
+										<TableHead className="text-right">Action</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
 								{candidatesQuery.data?.map((candidate) => {
 									const contextCandidate = candidateContext.getCandidate(candidate.id) ?? candidate
 									// Apply context skill preferences for display
@@ -1941,8 +1974,9 @@ export function CandidatesSection() {
 									</TableRow>
 									)
 								})}
-							</TableBody>
-						</Table>
+								</TableBody>
+							</Table>
+						</div>
 					)}
 				</CardContent>
 			</Card>
